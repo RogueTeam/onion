@@ -9,6 +9,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
+func NewKey() (privKey crypto.PrivKey, err error) {
+	privKey, _, err = crypto.GenerateEd25519Key(rand.Reader)
+	return privKey, err
+}
+
 func LoadIdentity(location string) (privKey crypto.PrivKey, err error) {
 	if _, err := os.Stat(location); err == nil {
 		log.Println("[*] Loading existing Key Pair")
@@ -24,7 +29,7 @@ func LoadIdentity(location string) (privKey crypto.PrivKey, err error) {
 		return privKey, nil
 	} else if os.IsNotExist(err) {
 		log.Println("[*] Generating Key Pair")
-		privKey, _, err = crypto.GenerateKeyPairWithReader(crypto.Ed25519, -1, rand.Reader)
+		privKey, err = NewKey()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate private key: %w", err)
 		}
