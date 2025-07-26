@@ -1,0 +1,47 @@
+package onion
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net"
+
+	"github.com/RogueTeam/onion/utils"
+	"github.com/libp2p/go-libp2p/core/peer"
+)
+
+type ConnectInternal struct {
+	PeerId peer.ID `json:"peerId"`
+}
+
+func (s *Service) handleConnectInternal(cmd *Command, conn net.Conn, secured bool) (err error) {
+	if !secured {
+		return errors.New("connection not secured")
+	}
+	if cmd.Data.ConnectInternal != nil {
+		return errors.New("connect internal not passed")
+	}
+
+	ctx, cancel := utils.NewContext()
+	defer cancel()
+
+	info, err := s.dht.FindPeer(ctx, cmd.Data.ConnectInternal.PeerId)
+	if err != nil {
+		return fmt.Errorf("couldn't find peer: %w", err)
+	}
+
+	err = s.host.Connect(ctx, info)
+	if err != nil {
+		return fmt.Errorf("failed to connect to peer: %w", err)
+	}
+
+	stream, err := s.host.NewStream(ctx, info.ID, ProtocolId)
+	if err != nil {
+		return fmt.Errorf("failed to open stream: %w", err)
+	}
+
+	go io.Copy(conn, stream)
+	io.Copy(stream, conn)
+
+	return nil
+}

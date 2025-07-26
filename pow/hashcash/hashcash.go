@@ -65,7 +65,7 @@ func CountLeadingBits(s []byte) (n int) {
 
 // Creates a hashcash (hc)
 // hash is reset on every try
-func New(ctx context.Context, h hash.Hash, bits int, salt, payload string) (hc string, err error) {
+func New(ctx context.Context, h hash.Hash, bits uint64, salt, payload string) (hc string, err error) {
 	now := time.Now()
 
 	for counter := big.NewInt(0); ; counter = counter.Add(counter, big.NewInt(1)) {
@@ -79,7 +79,7 @@ func New(ctx context.Context, h hash.Hash, bits int, salt, payload string) (hc s
 
 			h.Write([]byte(hc))
 
-			if CountLeadingBits(h.Sum(nil)) == bits {
+			if uint64(CountLeadingBits(h.Sum(nil))) == bits {
 				return hc, nil
 			}
 		}
@@ -97,6 +97,37 @@ func Verify(h hash.Hash, hc string) (err error) {
 	bits, err := strconv.ParseUint(parts[1], 10, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse bits part: %w", err)
+	}
+
+	h.Reset()
+	h.Write([]byte(hc))
+
+	cBits := uint64(CountLeadingBits(h.Sum(nil)))
+	if bits != cBits {
+		return fmt.Errorf("expecting %d bits but got %d", bits, cBits)
+	}
+	return nil
+}
+
+// Same as Verify but checks the if needed bits is greater or equal to the passed difficulty
+func VerifyWithDifficultyAndPayload(h hash.Hash, hc string, difficulty uint64, payload string) (err error) {
+	var parts = strings.Split(hc, ":")
+	if len(parts) != 7 {
+		return errors.New("invalid hashcash")
+	}
+
+	expectedPayload := parts[2]
+	if payload != expectedPayload {
+		return errors.New("expecting a different payload")
+	}
+
+	bits, err := strconv.ParseUint(parts[1], 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse bits part: %w", err)
+	}
+
+	if bits < difficulty {
+		return fmt.Errorf("expecting difficulty: %d but got difficulty: %d", difficulty, bits)
 	}
 
 	h.Reset()

@@ -131,7 +131,7 @@ func Test_Integration(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
 		type Test struct {
 			Name    string // Added a Name field for descriptive test names
-			Bits    int
+			Bits    uint64
 			Algo    hash.Hash
 			Salt    string
 			Payload string

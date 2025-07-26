@@ -1,0 +1,105 @@
+package onion
+
+import (
+	"bufio"
+	"crypto/sha512"
+	"encoding/hex"
+	"fmt"
+	"io"
+
+	"github.com/RogueTeam/onion/crypto"
+	"github.com/RogueTeam/onion/pow/hashcash"
+	"github.com/RogueTeam/onion/utils"
+	"github.com/vmihailenco/msgpack/v5"
+)
+
+var DefaultHashAlgorithm = sha512.New512_256
+
+const (
+	DefaultSaltLength = 64
+)
+
+type (
+	Action      uint8
+	Compression uint8
+	Data        struct {
+		Noise           *Noise           `msgpack:",omitempty"`
+		ConnectInternal *ConnectInternal `msgpack:",omitempty"`
+		Settings        *Settings        `msgpack:",omitempty"`
+	}
+	Command struct {
+		Action   Action
+		Hashcash string
+		Data     Data
+	}
+	Settings struct {
+		PoWDifficulty uint64
+	}
+)
+
+const (
+	// Send the connection settings
+	ActionSettings Action = iota
+	// Upgrade connection to noise channel
+	ActionNoise
+	// Connects to other peer in the onion network
+	ActionConnectInternal
+	// Connects to a remote service
+	ActionConnectExternal
+)
+
+func (a Action) String() (s string) {
+	switch a {
+	case ActionNoise:
+		return "noise"
+	default:
+		return fmt.Sprintf("<invalid>:%d", a)
+	}
+}
+
+func (cmd *Command) Recv(r io.Reader, difficulty uint64) (err error) {
+	*cmd = Command{}
+	err = msgpack.NewDecoder(r).Decode(&cmd)
+	if err != nil {
+		return fmt.Errorf("failed to decode msgpack: %w", err)
+	}
+
+	payload, err := msgpack.Marshal(cmd.Data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal data into payload: %w", err)
+	}
+
+	err = hashcash.VerifyWithDifficultyAndPayload(DefaultHashAlgorithm(), cmd.Hashcash, difficulty, hex.EncodeToString(payload))
+	if err != nil {
+		return fmt.Errorf("failed to verify hashcash: %w", err)
+	}
+	return nil
+}
+
+func (cmd *Command) Send(w io.Writer, difficulty uint64) (err error) {
+	ctx, cancel := utils.NewContext()
+	defer cancel()
+
+	payload, err := msgpack.Marshal(cmd.Data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	cmd.Hashcash, err = hashcash.New(ctx, DefaultHashAlgorithm(), difficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
+	if err != nil {
+		return fmt.Errorf("failed to calculate hashcash: %w", err)
+	}
+
+	bw := bufio.NewWriter(w)
+
+	err = msgpack.NewEncoder(bw).Encode(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to encode: %w", err)
+	}
+
+	err = bw.Flush()
+	if err != nil {
+		return fmt.Errorf("failed to flush: %w", err)
+	}
+	return nil
+}
