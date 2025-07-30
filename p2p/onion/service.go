@@ -29,6 +29,8 @@ var (
 	OutsideModeP2PCid cid.Cid
 )
 
+// Initialize the CIDs used to find onion relays
+// These are hardcoded and area persistent cross boots
 func init() {
 	var err error
 	RelayModeP2PCid, err = createCID(RelayModeCidString)
@@ -40,6 +42,9 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println(RelayModeCidString)
+	log.Println(OutsideModeCidString)
 }
 
 func createCID[T string | []byte](data T) (cid.Cid, error) {
@@ -54,23 +59,44 @@ func createCID[T string | []byte](data T) (cid.Cid, error) {
 var DefaultSettings = &command.Settings{}
 
 type Config struct {
+	// Difficulty of the Proof Of Work
+	// Higher number will prevent span bots but will make harder to peers to use the node
 	PowDifficulty uint64
-	Host          host.Host
-	DHT           *dht.IpfsDHT
-	Bootstrap     bool
-	OutsideMode   bool
+	// LIBP2P host already listening and running
+	Host host.Host
+	// DHT instance already running
+	DHT *dht.IpfsDHT
+	// Run the bootstrap operation
+	// When set DHT will Bootstrap and wait until there are nodes connected
+	Bootstrap bool
+	// Do not advertise this node.
+	// Make sure to run this with a Client only DHT
+	HiddenMode bool
+	// Allow connections outside the network.
+	// This basically connects the node into a proxy to the clearnet
+	// Just like Tor's Exit nodes.
+	OutsideMode bool
 }
 
+// You could try to setup your own service instance by setting this fields but the
+// "New" function is a plus helper for configuring everything
 type Service struct {
+	// Settings exposed to connected peers in order to successfully handshake and authenticate commands
 	Settings command.Settings
-	ID       peer.ID
-	Noise    *noise.Transport
-	Host     host.Host
-	DHT      *dht.IpfsDHT
+	// Id of the peer
+	ID peer.ID
+	// Noise upgrader. Used for preventing relays from sniffing your traffic.
+	Noise *noise.Transport
+	// Host already binding to an address
+	Host host.Host
+	// DHT service. Configured entirely by you
+	DHT *dht.IpfsDHT
 }
 
 const ProtocolId protocol.ID = "/onionp2p"
 
+// Register the service into a existing host.Host.
+// Check the docs of Config
 func New(cfg Config) (s *Service, err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()

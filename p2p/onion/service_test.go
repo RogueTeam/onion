@@ -129,7 +129,7 @@ func Test_Integration(t *testing.T) {
 		})
 		assertions.Nil(err, "failed to prepare peer service")
 
-		clientSvc.FindPeers()
+		clientSvc.ListPeers()
 
 		_, err = clientSvc.Circuit(targets)
 		assertions.Nil(err, "failed to prepare circuit")

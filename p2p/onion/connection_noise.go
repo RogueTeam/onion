@@ -12,7 +12,7 @@ import (
 
 // Upgrades the connection to use a noise channel
 // If succeed output net.Conn is secured by encryption tunnel
-func (c *Connection) handleNoise(cmd *command.Command) (err error) {
+func (c *Connection) UpgradeToNoise(cmd *command.Command) (err error) {
 	if cmd.Data.Noise == nil {
 		return errors.New("noise not passed")
 	}

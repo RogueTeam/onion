@@ -13,7 +13,7 @@ func (s *Service) StreamHandler(stream network.Stream) {
 	conn := Connection{
 		Host:     s.Host,
 		DHT:      s.DHT,
-		Conn:     &Stream{Stream: stream},
+		Conn:     &NetConnStream{Stream: stream},
 		Settings: s.Settings,
 		Stream:   stream,
 		Logger: log.Logger{

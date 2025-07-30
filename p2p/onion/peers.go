@@ -14,8 +14,12 @@ type Peer struct {
 	Modes set.Set[cid.Cid]
 }
 
-// Find peers based on a set of conditions
-func (s *Service) FindPeers() (peers []*Peer, err error) {
+// Lists peers compatible to the onion network.
+// This function is useful with some filtering from your part.
+// It returns a raw list of the peers using the onion protocol.
+// You could filter based on public threats, remove possible fake nodes.
+// Specific countries, etc.
+func (s *Service) ListPeers() (peers []*Peer, err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 

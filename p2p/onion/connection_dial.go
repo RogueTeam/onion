@@ -10,7 +10,8 @@ import (
 	"github.com/RogueTeam/onion/utils"
 )
 
-func (c *Connection) handleConnectInternal(cmd *command.Command) (err error) {
+// Connect to other peer inside the onion network. Used for extending existing Circuits
+func (c *Connection) ConnectInternal(cmd *command.Command) (err error) {
 	if !c.Secured {
 		return errors.New("connection not secured")
 	}
