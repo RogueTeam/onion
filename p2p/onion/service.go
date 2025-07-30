@@ -14,6 +14,9 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
+// Empty settings
+var DefaultSettings = &Settings{}
+
 type Config struct {
 	PowDifficulty uint64
 	Host          host.Host

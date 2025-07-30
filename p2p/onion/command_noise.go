@@ -31,9 +31,7 @@ func (s *Service) handleNoise(cmd *Command, conn net.Conn) (secured net.Conn, er
 		return nil, fmt.Errorf("failed to get peer id from public key: %w", err)
 	}
 
-	ctx, cancel := utils.NewContext()
-	defer cancel()
-
+	ctx, _ := utils.NewContext()
 	secured, err = s.incomingNoise.SecureInbound(ctx, conn, peerId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upgrade connection: %w", err)

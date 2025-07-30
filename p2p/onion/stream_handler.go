@@ -23,7 +23,7 @@ func (s *Service) StreamHandler(stream network.Stream) {
 			Settings: &s.settings,
 		},
 	}
-	err := settings.Send(stream, &Settings{PoWDifficulty: 0})
+	err := settings.Send(stream, DefaultSettings)
 	if err != nil {
 		logger.Log(log.LogLevelError, "SENDING SETTINGS: %v", err)
 		return

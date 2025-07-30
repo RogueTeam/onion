@@ -1,13 +1,13 @@
 package onion
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/identity"
+	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -44,8 +44,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 
 	var conn net.Conn
 	if c.rootStream == nil {
-		ctx := context.TODO()
-
+		ctx, _ := utils.NewContext()
 		c.rootStream, err = c.service.host.NewStream(ctx, id, ProtocolId)
 		if err != nil {
 			return fmt.Errorf("failed to connecto to root peer: %w", err)
@@ -76,7 +75,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 
 	// Retrieve settings
 	var settingsCmd Command
-	err = settingsCmd.Recv(conn, &Settings{PoWDifficulty: 0})
+	err = settingsCmd.Recv(conn, DefaultSettings)
 	if err != nil {
 		return fmt.Errorf("failed to receive settings msg: %w", err)
 	}
@@ -107,7 +106,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 		return fmt.Errorf("failed to prepare noise transport: %w", err)
 	}
 
-	ctx := context.TODO()
+	ctx, _ := utils.NewContext()
 	c.active, err = ns.SecureOutbound(ctx, conn, id)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade connection: %w", err)
