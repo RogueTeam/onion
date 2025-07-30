@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
@@ -80,6 +81,10 @@ func (m *Msg) Recv(r io.Reader) (err error) {
 }
 
 func send(w io.Writer, data []byte) (err error) {
+	if w == nil {
+		return errors.New("not writer passed")
+	}
+
 	buf := buffersPool.Get()
 	defer buffersPool.Put(buf)
 	buf.Reset()

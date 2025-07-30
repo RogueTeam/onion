@@ -19,8 +19,9 @@ func (s *Service) StreamHandler(stream network.Stream) {
 		Logger: log.Logger{
 			PeerID: stream.Conn().RemotePeer(),
 		},
-		Noise:   s.Noise,
-		Secured: false,
+		Noise:        s.Noise,
+		Secured:      false,
+		ExternalMode: s.Settings.OutsideMode,
 	}
 	err := conn.Handle()
 	if err != nil {

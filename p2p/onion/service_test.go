@@ -2,7 +2,6 @@ package onion_test
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"testing"
 
@@ -13,6 +12,8 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,9 +46,8 @@ func Test_Integration(t *testing.T) {
 				return
 			}
 
-			port := index + 8888
 			host, err := libp2p.New(
-				libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/127.0.0.1/udp/%d/quic-v1", port)),
+				libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/0/quic-v1"),
 				libp2p.Identity(ident),
 			)
 			if !assertions.Nil(err, "failed to prepare peer") {
@@ -131,7 +131,43 @@ func Test_Integration(t *testing.T) {
 
 		clientSvc.ListPeers()
 
-		_, err = clientSvc.Circuit(targets)
+		c, err := clientSvc.Circuit(targets)
 		assertions.Nil(err, "failed to prepare circuit")
+		defer c.Close()
+
+		maddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
+		if !assertions.Nil(err, "failed to prepare maddr") {
+			return
+		}
+
+		l, err := manet.Listen(maddr)
+		if !assertions.Nil(err, "failed to listen") {
+			return
+		}
+		defer l.Close()
+
+		var payload = []byte("HELLO")
+		go func() {
+			conn, err := l.Accept()
+			if !assertions.Nil(err, "failed to accept connection") {
+				return
+			}
+			_, err = conn.Write(payload)
+			assertions.Nil(err, "failed to write payload")
+		}()
+
+		conn, err := c.External(l.Multiaddr())
+		if !assertions.Nil(err, "failed to dial to external") {
+			return
+		}
+		defer conn.Close()
+
+		var received = make([]byte, len(payload))
+		_, err = conn.Read(received)
+		if !assertions.Nil(err, "failed to receive from listener") {
+			return
+		}
+
+		assertions.Equal(payload, received, "payload")
 	})
 }

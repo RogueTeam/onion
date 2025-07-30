@@ -33,6 +33,8 @@ type Connection struct {
 	// No other command can be used if the connection is not firstly
 	// secured using the noise channel
 	Secured bool
+	// Used for identifying those peers that support External mode (Exit nodes)
+	ExternalMode bool
 }
 
 // Base logic for handling the connection
@@ -65,13 +67,16 @@ func (c *Connection) Handle() (err error) {
 			if err != nil {
 				return fmt.Errorf("failed to handle noise command: %w", err)
 			}
-		case command.ActionDial:
-			err = c.ConnectInternal(&cmd)
+		case command.ActionExtend:
+			err = c.Extend(&cmd)
 			if err != nil {
-				return fmt.Errorf("failed to handle connect internal: %w", err)
+				return fmt.Errorf("failed to handle dial: %w", err)
 			}
 		case command.ActionExternal:
-			// TODO: Connect to PROTOCOL IP:PORT
+			err = c.External(&cmd)
+			if err != nil {
+				return fmt.Errorf("failed to handle external: %w", err)
+			}
 			break
 		default:
 			return fmt.Errorf("unknown command: %s", cmd.Action.String())

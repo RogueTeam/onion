@@ -12,6 +12,7 @@ import (
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -27,13 +28,17 @@ type (
 	Noise       struct {
 		PeerPublicKey []byte `json:"peerId"`
 	}
-	ConnectInternal struct {
+	Extend struct {
 		PeerId peer.ID `json:"peerId"`
 	}
+	External struct {
+		Address multiaddr.Multiaddr `json:"address"`
+	}
 	Data struct {
-		Noise           *Noise           `msgpack:",omitempty"`
-		ConnectInternal *ConnectInternal `msgpack:",omitempty"`
-		Settings        *Settings        `msgpack:",omitempty"`
+		Noise    *Noise    `msgpack:",omitempty"`
+		Extend   *Extend   `msgpack:",omitempty"`
+		External *External `msgpack:",omitempty"`
+		Settings *Settings `msgpack:",omitempty"`
 	}
 	Command struct {
 		Action   Action
@@ -52,7 +57,7 @@ const (
 	// Upgrade connection to noise channel
 	ActionNoise
 	// Connects to other peer in the onion network
-	ActionDial
+	ActionExtend
 	// Connects to a remote service
 	ActionExternal
 )
@@ -61,8 +66,8 @@ func (a Action) String() (s string) {
 	switch a {
 	case ActionNoise:
 		return "noise"
-	case ActionDial:
-		return "dial"
+	case ActionExtend:
+		return "extend"
 	case ActionExternal:
 		return "external"
 	default:

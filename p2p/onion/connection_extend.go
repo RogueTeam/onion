@@ -11,38 +11,34 @@ import (
 )
 
 // Connect to other peer inside the onion network. Used for extending existing Circuits
-func (c *Connection) ConnectInternal(cmd *command.Command) (err error) {
+func (c *Connection) Extend(cmd *command.Command) (err error) {
 	if !c.Secured {
 		return errors.New("connection not secured")
 	}
-	if cmd.Data.ConnectInternal == nil {
-		return errors.New("connect internal not passed")
+	if cmd.Data.Extend == nil {
+		return errors.New("extend not passed")
 	}
 
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	info, err := c.DHT.FindPeer(ctx, cmd.Data.ConnectInternal.PeerId)
-	if err != nil {
-		return fmt.Errorf("couldn't find peer: %w", err)
-	}
+	c.Logger.Log(log.LogLevelDebug, "Connected to peer: %v", cmd.Data.Extend.PeerId)
 
-	err = c.Host.Connect(ctx, info)
-	if err != nil {
-		return fmt.Errorf("failed to connect to peer: %w", err)
-	}
-
-	c.Logger.Log(log.LogLevelDebug, "Connected to peer: %v", info)
-
-	stream, err := c.Host.NewStream(ctx, info.ID, ProtocolId)
+	// By its own this connection can be seen in plaintext.
+	// Its important to always upgrade to Noise channel
+	stream, err := c.Host.NewStream(ctx, cmd.Data.Extend.PeerId, ProtocolId)
 	if err != nil {
 		return fmt.Errorf("failed to open stream: %w", err)
 	}
+	defer stream.Close()
 
 	c.Logger.Log(log.LogLevelDebug, "Piping traffic")
 	defer c.Logger.Log(log.LogLevelDebug, "Finished")
 	go io.Copy(c.Conn, stream)
-	io.Copy(stream, c.Conn)
+	_, err = io.Copy(stream, c.Conn)
+	if err != nil {
+		return fmt.Errorf("failed to copy from conn: %w", err)
+	}
 
 	return nil
 }
