@@ -2,7 +2,6 @@ package onion_test
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"slices"
 	"testing"
@@ -45,8 +44,6 @@ func Test_Integration(t *testing.T) {
 			if !assertions.Nil(err, "failed to prepare peer-1 key") {
 				return
 			}
-			rawIdent, _ := ident.Raw()
-			t.Logf("Identity: %v", hex.EncodeToString(rawIdent))
 
 			port := index + 8888
 			host, err := libp2p.New(
@@ -78,13 +75,11 @@ func Test_Integration(t *testing.T) {
 			assertions.Nil(err, "failed to prepare DHT")
 			dhts = append(dhts, peerDht)
 
-			err = peerDht.Bootstrap(context.TODO())
-			assertions.Nil(err, "failed to bootstrap")
-
 			svc, err := onion.New(onion.Config{
 				PowDifficulty: 1,
 				Host:          host,
 				DHT:           peerDht,
+				Bootstrap:     index != 0,
 			})
 			assertions.Nil(err, "failed to prepare peer service")
 			svcs = append(svcs, svc)
@@ -120,9 +115,6 @@ func Test_Integration(t *testing.T) {
 		assertions.Nil(err, "failed to prepare client DHT")
 		defer clientPeerDht.Close()
 
-		err = clientPeerDht.Bootstrap(context.TODO())
-		assertions.Nil(err, "failed to bootstrap")
-
 		targets := make([]peer.ID, 0, len(peers))
 		for _, peer := range slices.Backward(peers) {
 			targets = append(targets, peer.ID())
@@ -132,14 +124,11 @@ func Test_Integration(t *testing.T) {
 			PowDifficulty: 1,
 			Host:          client,
 			DHT:           clientPeerDht,
+			Bootstrap:     true,
 		})
 		assertions.Nil(err, "failed to prepare peer service")
 
-		c, err := clientSvc.Circuit(targets)
+		_, err = clientSvc.Circuit(targets)
 		assertions.Nil(err, "failed to prepare circuit")
-
-		t.Logf("Circuit: %v", c)
-
-		t.Logf("DHT peers: %v", clientPeerDht.RoutingTable().ListPeers())
 	})
 }

@@ -58,7 +58,7 @@ func (a Action) String() (s string) {
 	}
 }
 
-func (cmd *Command) Recv(r io.Reader, difficulty uint64) (err error) {
+func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
 	*cmd = Command{}
 	err = msgpack.NewDecoder(r).Decode(&cmd)
 	if err != nil {
@@ -71,14 +71,14 @@ func (cmd *Command) Recv(r io.Reader, difficulty uint64) (err error) {
 	}
 	log.Println(hex.EncodeToString(payload))
 
-	err = hashcash.VerifyWithDifficultyAndPayload(DefaultHashAlgorithm(), cmd.Hashcash, difficulty, hex.EncodeToString(payload))
+	err = hashcash.VerifyWithDifficultyAndPayload(DefaultHashAlgorithm(), cmd.Hashcash, settings.PoWDifficulty, hex.EncodeToString(payload))
 	if err != nil {
 		return fmt.Errorf("failed to verify hashcash: %w", err)
 	}
 	return nil
 }
 
-func (cmd *Command) Send(w io.Writer, difficulty uint64) (err error) {
+func (cmd *Command) Send(w io.Writer, settings *Settings) (err error) {
 	payload, err := msgpack.Marshal(cmd.Data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
@@ -87,7 +87,7 @@ func (cmd *Command) Send(w io.Writer, difficulty uint64) (err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cmd.Hashcash, err = hashcash.New(ctx, DefaultHashAlgorithm(), difficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
+	cmd.Hashcash, err = hashcash.New(ctx, DefaultHashAlgorithm(), settings.PoWDifficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
 	if err != nil {
 		return fmt.Errorf("failed to calculate hashcash: %w", err)
 	}

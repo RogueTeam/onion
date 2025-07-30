@@ -68,7 +68,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 				},
 			},
 		}
-		err = connInternal.Send(conn, oldSettings.PoWDifficulty)
+		err = connInternal.Send(conn, oldSettings)
 		if err != nil {
 			return fmt.Errorf("failed to send connect internal: %w", err)
 		}
@@ -76,7 +76,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 
 	// Retrieve settings
 	var settingsCmd Command
-	err = settingsCmd.Recv(conn, 0)
+	err = settingsCmd.Recv(conn, &Settings{PoWDifficulty: 0})
 	if err != nil {
 		return fmt.Errorf("failed to receive settings msg: %w", err)
 	}
@@ -97,7 +97,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 			},
 		},
 	}
-	err = noiseCmd.Send(conn, settings.PoWDifficulty)
+	err = noiseCmd.Send(conn, settings)
 	if err != nil {
 		return fmt.Errorf("failed to send noise request: %w", err)
 	}

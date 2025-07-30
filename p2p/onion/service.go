@@ -2,12 +2,11 @@ package onion
 
 import (
 	"fmt"
-	"log"
-	"net"
 
+	"github.com/RogueTeam/onion/p2p/dhtutils"
+	"github.com/RogueTeam/onion/utils"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
@@ -19,10 +18,11 @@ type Config struct {
 	PowDifficulty uint64
 	Host          host.Host
 	DHT           *dht.IpfsDHT
+	Bootstrap     bool
 }
 
 type Service struct {
-	powDifficulty uint64
+	settings      Settings
 	id            peer.ID
 	incomingNoise *noise.Transport
 	host          host.Host
@@ -31,72 +31,24 @@ type Service struct {
 
 const ProtocolId protocol.ID = "/onionp2p"
 
-// Handles the stream
-// On any error the stream is closed
-func (s *Service) StreamHandler(stream network.Stream) {
-	defer stream.Close()
-
-	// Send Settings
-	var settings = Command{
-		Action: ActionSettings,
-		Data: Data{
-			Settings: &Settings{
-				PoWDifficulty: s.powDifficulty,
-			},
-		},
-	}
-	err := settings.Send(stream, 0)
-	if err != nil {
-		log.Println("ERROR: SENDING SETTINGS:", err)
-		return
-	}
-	//
-
-	var secured bool
-	var conn net.Conn = &Stream{Stream: stream}
-
-	var cmd Command
-	for {
-		err := cmd.Recv(conn, s.powDifficulty)
-		if err != nil {
-			log.Println("ERROR: READING COMMAND:", err)
-			return
-		}
-
-		switch cmd.Action {
-		case ActionNoise:
-			conn, err = s.handleNoise(&cmd, conn)
-			if err != nil {
-				log.Println("ERROR: NOISE COMMAND:", err)
-				return
-			}
-			secured = true
-		case ActionConnectInternal:
-			err = s.handleConnectInternal(&cmd, conn, secured)
-			if err != nil {
-				log.Println("ERROR: CONNECT INTERNAL:", err)
-				return
-			}
-		case ActionConnectExternal:
-			if !secured {
-				log.Println("ERROR: NOISE NOT SET")
-				return
-			}
-			// TODO: Connect to PROTOCOL IP:PORT
-			break
-		default:
-			log.Println("ERROR: UNKNOWN COMMAND:", cmd.Action.String())
-			return
-		}
-	}
-}
-
 func New(cfg Config) (s *Service, err error) {
+	ctx, cancel := utils.NewContext()
+	defer cancel()
+
+	if cfg.Bootstrap {
+		err = dhtutils.WaitForBootstrap(ctx, cfg.Host, cfg.DHT)
+		if err != nil {
+			return nil, fmt.Errorf("failed to bootstrap: %w", err)
+		}
+	}
+
 	s = &Service{
-		powDifficulty: cfg.PowDifficulty,
-		id:            cfg.Host.ID(),
-		host:          cfg.Host,
-		dht:           cfg.DHT,
+		settings: Settings{
+			PoWDifficulty: cfg.PowDifficulty,
+		},
+		id:   cfg.Host.ID(),
+		host: cfg.Host,
+		dht:  cfg.DHT,
 	}
 
 	s.incomingNoise, err = noise.New(
