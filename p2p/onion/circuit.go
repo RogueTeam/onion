@@ -1,12 +1,12 @@
 package onion
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/identity"
-	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -37,8 +37,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 
 	var conn net.Conn
 	if c.rootStream == nil {
-		ctx, cancel := utils.NewContext()
-		defer cancel()
+		ctx := context.TODO()
 
 		c.rootStream, err = c.service.host.NewStream(ctx, id, ProtocolId)
 		if err != nil {
@@ -101,8 +100,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 		return fmt.Errorf("failed to prepare noise transport: %w", err)
 	}
 
-	ctx, cancel := utils.NewContext()
-	defer cancel()
+	ctx := context.TODO()
 	c.active, err = ns.SecureOutbound(ctx, conn, id)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade connection: %w", err)
@@ -125,12 +123,13 @@ func (s *Service) Circuit(peers []peer.ID) (c *Circuit, err error) {
 	}
 
 	c = &Circuit{
-		service: s,
+		settings: make(map[peer.ID]*Settings),
+		service:  s,
 	}
 	for _, peerId := range peers {
 		err = c.Subconnect(peerId)
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to peer: %w", err)
+			return nil, fmt.Errorf("failed to connect to peer: %s: %w", peerId, err)
 		}
 	}
 	return c, nil

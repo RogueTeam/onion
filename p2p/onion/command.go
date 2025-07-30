@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/pow/hashcash"
@@ -68,6 +69,7 @@ func (cmd *Command) Recv(r io.Reader, difficulty uint64) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data into payload: %w", err)
 	}
+	log.Println(hex.EncodeToString(payload))
 
 	err = hashcash.VerifyWithDifficultyAndPayload(DefaultHashAlgorithm(), cmd.Hashcash, difficulty, hex.EncodeToString(payload))
 	if err != nil {
@@ -77,13 +79,13 @@ func (cmd *Command) Recv(r io.Reader, difficulty uint64) (err error) {
 }
 
 func (cmd *Command) Send(w io.Writer, difficulty uint64) (err error) {
-	ctx, cancel := utils.NewContext()
-	defer cancel()
-
 	payload, err := msgpack.Marshal(cmd.Data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
+
+	ctx, cancel := utils.NewContext()
+	defer cancel()
 
 	cmd.Hashcash, err = hashcash.New(ctx, DefaultHashAlgorithm(), difficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
 	if err != nil {

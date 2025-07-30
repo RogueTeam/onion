@@ -116,9 +116,9 @@ func VerifyWithDifficultyAndPayload(h hash.Hash, hc string, difficulty uint64, p
 		return errors.New("invalid hashcash")
 	}
 
-	expectedPayload := parts[2]
+	expectedPayload := parts[4]
 	if payload != expectedPayload {
-		return errors.New("expecting a different payload")
+		return fmt.Errorf("expecting a different payload: %s != %s", payload, expectedPayload)
 	}
 
 	bits, err := strconv.ParseUint(parts[1], 10, 64)

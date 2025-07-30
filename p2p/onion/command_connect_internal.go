@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 
 	"github.com/RogueTeam/onion/utils"
@@ -18,7 +19,7 @@ func (s *Service) handleConnectInternal(cmd *Command, conn net.Conn, secured boo
 	if !secured {
 		return errors.New("connection not secured")
 	}
-	if cmd.Data.ConnectInternal != nil {
+	if cmd.Data.ConnectInternal == nil {
 		return errors.New("connect internal not passed")
 	}
 
@@ -35,11 +36,15 @@ func (s *Service) handleConnectInternal(cmd *Command, conn net.Conn, secured boo
 		return fmt.Errorf("failed to connect to peer: %w", err)
 	}
 
+	log.Println("Connected to peer:", info)
+
 	stream, err := s.host.NewStream(ctx, info.ID, ProtocolId)
 	if err != nil {
 		return fmt.Errorf("failed to open stream: %w", err)
 	}
 
+	log.Println("Piping traffic")
+	defer log.Println("Finished")
 	go io.Copy(conn, stream)
 	io.Copy(stream, conn)
 

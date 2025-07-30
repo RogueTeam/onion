@@ -17,7 +17,7 @@ type Noise struct {
 // Upgrades the connection to use a noise channel
 // If succeed output net.Conn is secured by encryption tunnel
 func (s *Service) handleNoise(cmd *Command, conn net.Conn) (secured net.Conn, err error) {
-	if cmd.Data.Noise != nil {
+	if cmd.Data.Noise == nil {
 		return nil, errors.New("noise not passed")
 	}
 
