@@ -68,14 +68,6 @@ func Test_Integration(t *testing.T) {
 				return others
 			}()
 
-			for _, info := range currentAddrs {
-				if info.ID == host.ID() {
-					continue
-				}
-				err = host.Connect(context.TODO(), info)
-				assertions.Nil(err, "failed to connect to remote from host")
-			}
-
 			peerDht, err := dht.New(
 				context.TODO(),
 				host,
@@ -85,6 +77,9 @@ func Test_Integration(t *testing.T) {
 			)
 			assertions.Nil(err, "failed to prepare DHT")
 			dhts = append(dhts, peerDht)
+
+			err = peerDht.Bootstrap(context.TODO())
+			assertions.Nil(err, "failed to bootstrap")
 
 			svc, err := onion.New(onion.Config{
 				PowDifficulty: 1,
@@ -115,14 +110,6 @@ func Test_Integration(t *testing.T) {
 			return others
 		}()
 
-		for _, info := range currentAddrs {
-			if info.ID == client.ID() {
-				continue
-			}
-			err = client.Connect(context.TODO(), info)
-			assertions.Nil(err, "failed to connect to remote from host")
-		}
-
 		clientPeerDht, err := dht.New(
 			context.TODO(),
 			client,
@@ -132,6 +119,9 @@ func Test_Integration(t *testing.T) {
 		)
 		assertions.Nil(err, "failed to prepare client DHT")
 		defer clientPeerDht.Close()
+
+		err = clientPeerDht.Bootstrap(context.TODO())
+		assertions.Nil(err, "failed to bootstrap")
 
 		targets := make([]peer.ID, 0, len(peers))
 		for _, peer := range slices.Backward(peers) {
@@ -149,5 +139,7 @@ func Test_Integration(t *testing.T) {
 		assertions.Nil(err, "failed to prepare circuit")
 
 		t.Logf("Circuit: %v", c)
+
+		t.Logf("DHT peers: %v", clientPeerDht.RoutingTable().ListPeers())
 	})
 }

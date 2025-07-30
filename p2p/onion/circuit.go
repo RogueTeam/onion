@@ -2,6 +2,7 @@ package onion
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -16,11 +17,17 @@ import (
 )
 
 type Circuit struct {
-	currentPeer peer.ID
-	settings    map[peer.ID]*Settings
-	service     *Service
-	rootStream  network.Stream
-	active      net.Conn
+	currentPeer  peer.ID
+	orderedPeers []peer.ID
+	settings     map[peer.ID]*Settings
+	service      *Service
+	rootStream   network.Stream
+	active       net.Conn
+}
+
+func (c *Circuit) String() (s string) {
+	raw, _ := json.Marshal(c.orderedPeers)
+	return string(raw)
 }
 
 func (c *Circuit) Subconnect(id peer.ID) (err error) {
