@@ -9,9 +9,9 @@ import (
 	"log"
 
 	"github.com/RogueTeam/onion/crypto"
+	"github.com/RogueTeam/onion/p2p/onion/msg"
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
-	"github.com/klauspost/compress/gzip"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -66,16 +66,15 @@ func (a Action) String() (s string) {
 	}
 }
 
-var buffersPool = utils.NewPool[bytes.Buffer]()
-
 func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
-	compressR, err := gzip.NewReader(r)
+	var msg msg.Msg
+	err = msg.Recv(r)
 	if err != nil {
-		return fmt.Errorf("failed to prepare reader: %w", err)
+		return fmt.Errorf("failed to receive raw msg: %w", err)
 	}
 
 	*cmd = Command{}
-	err = msgpack.NewDecoder(compressR).Decode(&cmd)
+	err = msgpack.NewDecoder(bytes.NewReader(msg.Data)).Decode(&cmd)
 	if err != nil {
 		return fmt.Errorf("failed to decode msgpack: %w", err)
 	}
@@ -94,6 +93,7 @@ func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
 }
 
 func (cmd *Command) Send(w io.Writer, settings *Settings) (err error) {
+	// Prepare Command
 	payload, err := msgpack.Marshal(cmd.Data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
@@ -107,31 +107,17 @@ func (cmd *Command) Send(w io.Writer, settings *Settings) (err error) {
 		return fmt.Errorf("failed to calculate hashcash: %w", err)
 	}
 
-	var buf = buffersPool.Get()
-	defer buffersPool.Put(buf)
-	buf.Reset()
+	// Prepare buffer to send
 
-	compressW := gzip.NewWriter(buf)
-
-	raw, _ := msgpack.Marshal(cmd)
-	err = msgpack.NewEncoder(compressW).Encode(cmd)
+	cmdBytes, err := msgpack.Marshal(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to encode: %w", err)
 	}
 
-	err = compressW.Flush()
+	// Send msg
+	err = msg.Send(w, cmdBytes)
 	if err != nil {
-		return fmt.Errorf("failed to compress: %w", err)
-	}
-
-	err = compressW.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close compress writer: %w", err)
-	}
-
-	_, err = w.Write(buf.Bytes())
-	if err != nil {
-		return fmt.Errorf("failed to write contents: %w", err)
+		return fmt.Errorf("failed to send msg: %w", err)
 	}
 	return nil
 }
