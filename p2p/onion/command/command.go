@@ -41,6 +41,7 @@ type (
 		Data     Data
 	}
 	Settings struct {
+		OutsideMode   bool
 		PoWDifficulty uint64
 	}
 )
@@ -51,15 +52,19 @@ const (
 	// Upgrade connection to noise channel
 	ActionNoise
 	// Connects to other peer in the onion network
-	ActionConnectInternal
+	ActionDial
 	// Connects to a remote service
-	ActionConnectExternal
+	ActionExternal
 )
 
 func (a Action) String() (s string) {
 	switch a {
 	case ActionNoise:
 		return "noise"
+	case ActionDial:
+		return "dial"
+	case ActionExternal:
+		return "external"
 	default:
 		return fmt.Sprintf("<invalid>:%d", a)
 	}

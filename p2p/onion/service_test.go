@@ -80,6 +80,7 @@ func Test_Integration(t *testing.T) {
 				Host:          host,
 				DHT:           peerDht,
 				Bootstrap:     index != 0,
+				OutsideMode:   true,
 			})
 			assertions.Nil(err, "failed to prepare peer service")
 			svcs = append(svcs, svc)
@@ -127,6 +128,8 @@ func Test_Integration(t *testing.T) {
 			Bootstrap:     true,
 		})
 		assertions.Nil(err, "failed to prepare peer service")
+
+		clientSvc.FindPeers()
 
 		_, err = clientSvc.Circuit(targets)
 		assertions.Nil(err, "failed to prepare circuit")

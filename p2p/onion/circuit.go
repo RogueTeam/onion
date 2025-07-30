@@ -46,7 +46,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 	var conn net.Conn
 	if c.rootStream == nil {
 		ctx, _ := utils.NewContext()
-		c.rootStream, err = c.service.host.NewStream(ctx, id, ProtocolId)
+		c.rootStream, err = c.service.Host.NewStream(ctx, id, ProtocolId)
 		if err != nil {
 			return fmt.Errorf("failed to connecto to root peer: %w", err)
 		}
@@ -61,7 +61,7 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 		conn = c.active
 
 		var connInternal = command.Command{
-			Action: command.ActionConnectInternal,
+			Action: command.ActionDial,
 			Data: command.Data{
 				ConnectInternal: &command.ConnectInternal{
 					PeerId: id,
