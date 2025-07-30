@@ -10,7 +10,7 @@ If you have experience working with Go, or maintaining I2P or Tor, OPSEC experie
 
 ## Abstract
 
-Tor and I2P are robust solutions for anonymous networking.
+While Tor and I2P offer robust solutions for anonymous networking, their powerful protocols currently lack straightforward methods for embedding into applications outside of the C/C++ and Java ecosystems. This project proposes a novel solution: **a small-codebase protocol powered by shared infrastructure such as libp2p.**
 
 ## Features
 
