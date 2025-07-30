@@ -17,6 +17,8 @@ func (s *Service) StreamHandler(stream network.Stream) {
 		PeerID: stream.Conn().RemotePeer(),
 	}
 
+	var conn net.Conn = &Stream{Stream: stream}
+
 	// Send Settings
 	var settings = command.Command{
 		Action: command.ActionSettings,
@@ -24,7 +26,7 @@ func (s *Service) StreamHandler(stream network.Stream) {
 			Settings: &s.settings,
 		},
 	}
-	err := settings.Send(stream, DefaultSettings)
+	err := settings.Send(conn, DefaultSettings)
 	if err != nil {
 		logger.Log(log.LogLevelError, "SENDING SETTINGS: %v", err)
 		return
@@ -32,7 +34,6 @@ func (s *Service) StreamHandler(stream network.Stream) {
 	//
 
 	var secured bool
-	var conn net.Conn = &Stream{Stream: stream}
 
 	var cmd command.Command
 	for {

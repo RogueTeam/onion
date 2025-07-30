@@ -1,4 +1,4 @@
-package msg
+package compressedtunnel
 
 import (
 	"bufio"
@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/RogueTeam/onion/utils"
 	"github.com/klauspost/compress/gzip"
@@ -79,7 +78,7 @@ func (m *Msg) Recv(r io.Reader) (err error) {
 	return nil
 }
 
-func Send(w io.Writer, data []byte) (err error) {
+func send(w io.Writer, data []byte) (err error) {
 	buf := buffersPool.Get()
 	defer buffersPool.Put(buf)
 	buf.Reset()
@@ -106,8 +105,7 @@ func Send(w io.Writer, data []byte) (err error) {
 
 	// Send msg
 	var msg Msg
-	compressed := buf.Bytes()
-	if len(compressed) < len(data) {
+	if buf.Len() < len(data) {
 		msg.Compression = CompressionGzip
 		msg.Length = uint64(buf.Len())
 		msg.Data = buf.Bytes()
@@ -128,7 +126,6 @@ func Send(w io.Writer, data []byte) (err error) {
 		return fmt.Errorf("failed to write length: %w", err)
 	}
 
-	log.Println("Sending", msg.String())
 	_, err = bw.Write(msg.Data)
 	if err != nil {
 		return fmt.Errorf("failed to write data: %w", err)
@@ -139,4 +136,26 @@ func Send(w io.Writer, data []byte) (err error) {
 		return fmt.Errorf("failed to flush writer: %w", err)
 	}
 	return nil
+}
+
+func SendSingle(w io.Writer, data []byte) (err error) {
+	return send(w, data)
+}
+
+func Send(w io.Writer, data []byte) (err error) {
+	const chunkSize = 1024
+	var chunk = make([]byte, chunkSize)
+
+	r := bytes.NewReader(data)
+	for {
+		n, err := r.Read(chunk)
+		if err != nil || n == 0 { // Only possible error is EOF
+			return nil
+		}
+
+		err = send(w, chunk[:n])
+		if err != nil {
+			return fmt.Errorf("failed to send chunk: %w", err)
+		}
+	}
 }

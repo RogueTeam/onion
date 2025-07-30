@@ -6,10 +6,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/RogueTeam/onion/crypto"
-	"github.com/RogueTeam/onion/p2p/onion/msg"
+	"github.com/RogueTeam/onion/net/compressedtunnel"
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -67,7 +66,7 @@ func (a Action) String() (s string) {
 }
 
 func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
-	var msg msg.Msg
+	var msg compressedtunnel.Msg
 	err = msg.Recv(r)
 	if err != nil {
 		return fmt.Errorf("failed to receive raw msg: %w", err)
@@ -83,7 +82,6 @@ func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data into payload: %w", err)
 	}
-	log.Println(hex.EncodeToString(payload))
 
 	err = hashcash.VerifyWithDifficultyAndPayload(DefaultHashAlgorithm(), cmd.Hashcash, settings.PoWDifficulty, hex.EncodeToString(payload))
 	if err != nil {
@@ -115,7 +113,7 @@ func (cmd *Command) Send(w io.Writer, settings *Settings) (err error) {
 	}
 
 	// Send msg
-	err = msg.Send(w, cmdBytes)
+	err = compressedtunnel.SendSingle(w, cmdBytes)
 	if err != nil {
 		return fmt.Errorf("failed to send msg: %w", err)
 	}
