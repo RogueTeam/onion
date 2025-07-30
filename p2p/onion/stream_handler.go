@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/log"
+	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/libp2p/go-libp2p/core/network"
 )
 
@@ -17,9 +18,9 @@ func (s *Service) StreamHandler(stream network.Stream) {
 	}
 
 	// Send Settings
-	var settings = Command{
-		Action: ActionSettings,
-		Data: Data{
+	var settings = command.Command{
+		Action: command.ActionSettings,
+		Data: command.Data{
 			Settings: &s.settings,
 		},
 	}
@@ -33,7 +34,7 @@ func (s *Service) StreamHandler(stream network.Stream) {
 	var secured bool
 	var conn net.Conn = &Stream{Stream: stream}
 
-	var cmd Command
+	var cmd command.Command
 	for {
 		err := cmd.Recv(conn, &s.settings)
 		if err != nil {
@@ -42,20 +43,20 @@ func (s *Service) StreamHandler(stream network.Stream) {
 		}
 
 		switch cmd.Action {
-		case ActionNoise:
+		case command.ActionNoise:
 			conn, err = s.handleNoise(&cmd, conn)
 			if err != nil {
 				logger.Log(log.LogLevelError, "NOISE COMMAND: %v", err)
 				return
 			}
 			secured = true
-		case ActionConnectInternal:
+		case command.ActionConnectInternal:
 			err = s.handleConnectInternal(&cmd, conn, secured)
 			if err != nil {
 				logger.Log(log.LogLevelError, "CONNECT INTERNAL: %v", err)
 				return
 			}
-		case ActionConnectExternal:
+		case command.ActionConnectExternal:
 			// TODO: Connect to PROTOCOL IP:PORT
 			break
 		default:

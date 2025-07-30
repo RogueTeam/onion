@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/identity"
+	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -19,7 +20,7 @@ import (
 type Circuit struct {
 	currentPeer  peer.ID
 	orderedPeers []peer.ID
-	settings     map[peer.ID]*Settings
+	settings     map[peer.ID]*command.Settings
 	service      *Service
 	rootStream   network.Stream
 	active       net.Conn
@@ -59,10 +60,10 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 		}
 		conn = c.active
 
-		var connInternal = Command{
-			Action: ActionConnectInternal,
-			Data: Data{
-				ConnectInternal: &ConnectInternal{
+		var connInternal = command.Command{
+			Action: command.ActionConnectInternal,
+			Data: command.Data{
+				ConnectInternal: &command.ConnectInternal{
 					PeerId: id,
 				},
 			},
@@ -74,13 +75,13 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 	}
 
 	// Retrieve settings
-	var settingsCmd Command
+	var settingsCmd command.Command
 	err = settingsCmd.Recv(conn, DefaultSettings)
 	if err != nil {
 		return fmt.Errorf("failed to receive settings msg: %w", err)
 	}
 
-	if settingsCmd.Action != ActionSettings || settingsCmd.Data.Settings == nil {
+	if settingsCmd.Action != command.ActionSettings || settingsCmd.Data.Settings == nil {
 		return errors.New("invalid settings command received")
 	}
 
@@ -88,10 +89,10 @@ func (c *Circuit) Subconnect(id peer.ID) (err error) {
 	c.settings[id] = settings
 
 	// Upgrade tunnel
-	var noiseCmd = Command{
-		Action: ActionNoise,
-		Data: Data{
-			Noise: &Noise{
+	var noiseCmd = command.Command{
+		Action: command.ActionNoise,
+		Data: command.Data{
+			Noise: &command.Noise{
 				PeerPublicKey: pubKeyBytes,
 			},
 		},
@@ -129,7 +130,7 @@ func (s *Service) Circuit(peers []peer.ID) (c *Circuit, err error) {
 	}
 
 	c = &Circuit{
-		settings: make(map[peer.ID]*Settings),
+		settings: make(map[peer.ID]*command.Settings),
 		service:  s,
 	}
 	for _, peerId := range peers {

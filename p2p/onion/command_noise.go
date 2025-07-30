@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,7 +17,7 @@ type Noise struct {
 
 // Upgrades the connection to use a noise channel
 // If succeed output net.Conn is secured by encryption tunnel
-func (s *Service) handleNoise(cmd *Command, conn net.Conn) (secured net.Conn, err error) {
+func (s *Service) handleNoise(cmd *command.Command, conn net.Conn) (secured net.Conn, err error) {
 	if cmd.Data.Noise == nil {
 		return nil, errors.New("noise not passed")
 	}

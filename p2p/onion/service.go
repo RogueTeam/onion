@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/RogueTeam/onion/p2p/dhtutils"
+	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -15,7 +16,7 @@ import (
 )
 
 // Empty settings
-var DefaultSettings = &Settings{}
+var DefaultSettings = &command.Settings{}
 
 type Config struct {
 	PowDifficulty uint64
@@ -25,7 +26,7 @@ type Config struct {
 }
 
 type Service struct {
-	settings      Settings
+	settings      command.Settings
 	id            peer.ID
 	incomingNoise *noise.Transport
 	host          host.Host
@@ -46,7 +47,7 @@ func New(cfg Config) (s *Service, err error) {
 	}
 
 	s = &Service{
-		settings: Settings{
+		settings: command.Settings{
 			PoWDifficulty: cfg.PowDifficulty,
 		},
 		id:   cfg.Host.ID(),

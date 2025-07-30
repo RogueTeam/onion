@@ -1,7 +1,7 @@
-package onion
+package command
 
 import (
-	"bufio"
+	"bytes"
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
@@ -11,6 +11,8 @@ import (
 	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
+	"github.com/klauspost/compress/gzip"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -23,7 +25,13 @@ const (
 type (
 	Action      uint8
 	Compression uint8
-	Data        struct {
+	Noise       struct {
+		PeerPublicKey []byte `json:"peerId"`
+	}
+	ConnectInternal struct {
+		PeerId peer.ID `json:"peerId"`
+	}
+	Data struct {
 		Noise           *Noise           `msgpack:",omitempty"`
 		ConnectInternal *ConnectInternal `msgpack:",omitempty"`
 		Settings        *Settings        `msgpack:",omitempty"`
@@ -58,9 +66,16 @@ func (a Action) String() (s string) {
 	}
 }
 
+var buffersPool = utils.NewPool[bytes.Buffer]()
+
 func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
+	compressR, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("failed to prepare reader: %w", err)
+	}
+
 	*cmd = Command{}
-	err = msgpack.NewDecoder(r).Decode(&cmd)
+	err = msgpack.NewDecoder(compressR).Decode(&cmd)
 	if err != nil {
 		return fmt.Errorf("failed to decode msgpack: %w", err)
 	}
@@ -92,16 +107,31 @@ func (cmd *Command) Send(w io.Writer, settings *Settings) (err error) {
 		return fmt.Errorf("failed to calculate hashcash: %w", err)
 	}
 
-	bw := bufio.NewWriter(w)
+	var buf = buffersPool.Get()
+	defer buffersPool.Put(buf)
+	buf.Reset()
 
-	err = msgpack.NewEncoder(bw).Encode(cmd)
+	compressW := gzip.NewWriter(buf)
+
+	raw, _ := msgpack.Marshal(cmd)
+	err = msgpack.NewEncoder(compressW).Encode(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to encode: %w", err)
 	}
 
-	err = bw.Flush()
+	err = compressW.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush: %w", err)
+		return fmt.Errorf("failed to compress: %w", err)
+	}
+
+	err = compressW.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close compress writer: %w", err)
+	}
+
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to write contents: %w", err)
 	}
 	return nil
 }

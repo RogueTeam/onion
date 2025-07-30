@@ -7,15 +7,11 @@ import (
 	"log"
 	"net"
 
+	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-type ConnectInternal struct {
-	PeerId peer.ID `json:"peerId"`
-}
-
-func (s *Service) handleConnectInternal(cmd *Command, conn net.Conn, secured bool) (err error) {
+func (s *Service) handleConnectInternal(cmd *command.Command, conn net.Conn, secured bool) (err error) {
 	if !secured {
 		return errors.New("connection not secured")
 	}
