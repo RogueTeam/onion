@@ -8,10 +8,11 @@ import (
 	"hash"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/RogueTeam/onion/pow/hashcash"
-	"github.com/RogueTeam/onion/utils"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 func Test_CountLeadingBits(t *testing.T) {
@@ -187,7 +188,7 @@ func Test_Integration(t *testing.T) {
 				assertions := assert.New(t)
 
 				// Assuming utils.NewContext() provides a context.Context and a cancellation function
-				ctx, cancel := utils.NewContext()
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Hour)
 				defer cancel() // Ensure the context is cancelled when the test finishes
 
 				// Create a new hashcash instance

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const DefaultTimeout = 5 * time.Minute
+const DefaultTimeout = 5 * time.Second
 
 func NewContext() (ctx context.Context, cancel func()) {
 	return NewContextWithTimeout(DefaultTimeout)

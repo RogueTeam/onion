@@ -12,7 +12,7 @@ type LogLevel string
 const (
 	LogLevelDebug LogLevel = "DEBUG"
 	LogLevelError LogLevel = "ERROR"
-	LogLevelIfo   LogLevel = "INFO"
+	LogLevelInfo  LogLevel = "INFO"
 )
 
 type Logger struct {

@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 
+	"github.com/RogueTeam/onion/p2p/log"
 	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
 )
 
-func (s *Service) handleConnectInternal(cmd *command.Command, conn net.Conn, secured bool) (err error) {
+func (s *Service) handleConnectInternal(logger *log.Logger, cmd *command.Command, conn net.Conn, secured bool) (err error) {
 	if !secured {
 		return errors.New("connection not secured")
 	}
@@ -32,15 +32,15 @@ func (s *Service) handleConnectInternal(cmd *command.Command, conn net.Conn, sec
 		return fmt.Errorf("failed to connect to peer: %w", err)
 	}
 
-	log.Println("Connected to peer:", info)
+	logger.Log(log.LogLevelDebug, "Connected to peer: %v", info)
 
 	stream, err := s.host.NewStream(ctx, info.ID, ProtocolId)
 	if err != nil {
 		return fmt.Errorf("failed to open stream: %w", err)
 	}
 
-	log.Println("Piping traffic")
-	defer log.Println("Finished")
+	logger.Log(log.LogLevelDebug, "Piping traffic")
+	defer logger.Log(log.LogLevelDebug, "Finished")
 	go io.Copy(conn, stream)
 	io.Copy(stream, conn)
 

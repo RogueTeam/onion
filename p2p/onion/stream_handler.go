@@ -52,7 +52,7 @@ func (s *Service) StreamHandler(stream network.Stream) {
 			}
 			secured = true
 		case command.ActionConnectInternal:
-			err = s.handleConnectInternal(&cmd, conn, secured)
+			err = s.handleConnectInternal(&logger, &cmd, conn, secured)
 			if err != nil {
 				logger.Log(log.LogLevelError, "CONNECT INTERNAL: %v", err)
 				return
