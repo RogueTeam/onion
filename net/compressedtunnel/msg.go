@@ -57,6 +57,7 @@ func (m *Msg) Recv(r io.Reader) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to read raw data: %w", err)
 	}
+	rawData = rawData[:n]
 
 	if uint64(n) != m.Length {
 		return fmt.Errorf("wrong length: expecting = %d but got %d", m.Length, n)
