@@ -6,11 +6,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 )
 
-type Stream struct {
+// Utility function to use Streams as net.Conn compatible
+type NetConnStream struct {
 	network.Stream
 }
 
-func (s *Stream) LocalAddr() net.Addr  { return nil }
-func (s *Stream) RemoteAddr() net.Addr { return nil }
+// TODO: Somehow populate this
+func (s *NetConnStream) LocalAddr() net.Addr  { return nil }
+func (s *NetConnStream) RemoteAddr() net.Addr { return nil }
 
-var _ net.Conn = (*Stream)(nil)
+var _ net.Conn = (*NetConnStream)(nil)
