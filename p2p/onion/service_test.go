@@ -86,88 +86,180 @@ func Test_Integration(t *testing.T) {
 			svcs = append(svcs, svc)
 		}
 
-		ident, err := identity.NewKey()
-		if !assertions.Nil(err, "failed to prepare peer-1 key") {
-			return
-		}
-		client, err := libp2p.New(
-			libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/9999/quic-v1"),
-			libp2p.Identity(ident),
-		)
-		if !assertions.Nil(err, "failed to prepare client peer") {
-			return
-		}
-		defer client.Close()
-
-		currentAddrs := func() (others []peer.AddrInfo) {
-			for _, peer := range peers {
-				others = append(others, peer.Peerstore().PeerInfo(peer.ID()))
-			}
-			return others
-		}()
-
-		clientPeerDht, err := dht.New(
-			context.TODO(),
-			client,
-			dht.Mode(dht.ModeClient),
-			dht.BootstrapPeers(currentAddrs...),
-			dht.Datastore(datastore.NewMapDatastore()),
-		)
-		assertions.Nil(err, "failed to prepare client DHT")
-		defer clientPeerDht.Close()
-
 		targets := make([]peer.ID, 0, len(peers))
 		for _, peer := range slices.Backward(peers) {
 			targets = append(targets, peer.ID())
 		}
 
-		clientSvc, err := onion.New(onion.Config{
-			PowDifficulty: 1,
-			Host:          client,
-			DHT:           clientPeerDht,
-			Bootstrap:     true,
-		})
-		assertions.Nil(err, "failed to prepare peer service")
+		type Test struct {
+			Name   string
+			Action func(t *testing.T, svc *onion.Service)
+		}
+		tests := []Test{
+			{
+				Name: "External",
+				Action: func(t *testing.T, svc *onion.Service) {
+					assertions := assert.New(t)
 
-		clientSvc.ListPeers()
+					c, err := svc.Circuit(targets)
+					assertions.Nil(err, "failed to prepare circuit")
+					defer c.Close()
 
-		c, err := clientSvc.Circuit(targets)
-		assertions.Nil(err, "failed to prepare circuit")
-		defer c.Close()
+					maddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
+					if !assertions.Nil(err, "failed to prepare maddr") {
+						return
+					}
 
-		maddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
-		if !assertions.Nil(err, "failed to prepare maddr") {
-			return
+					l, err := manet.Listen(maddr)
+					if !assertions.Nil(err, "failed to listen") {
+						return
+					}
+					defer l.Close()
+
+					var payload = []byte("HELLO")
+					go func() {
+						conn, err := l.Accept()
+						if !assertions.Nil(err, "failed to accept connection") {
+							return
+						}
+						_, err = conn.Write(payload)
+						assertions.Nil(err, "failed to write payload")
+					}()
+
+					conn, err := c.External(l.Multiaddr())
+					if !assertions.Nil(err, "failed to dial to external") {
+						return
+					}
+					defer conn.Close()
+
+					var received = make([]byte, len(payload))
+					_, err = conn.Read(received)
+					if !assertions.Nil(err, "failed to receive from listener") {
+						return
+					}
+
+					assertions.Equal(payload, received, "payload")
+				},
+			},
+			{
+				Name: "Hidden-Service",
+				Action: func(t *testing.T, svc *onion.Service) {
+					assertions := assert.New(t)
+
+					// Prepare listener
+					c1, err := svc.Circuit(targets)
+					if !assertions.Nil(err, "failed to prepare circuit") {
+						return
+					}
+					defer c1.Close()
+
+					hiddenPriv, err := identity.NewKey()
+					if !assertions.Nil(err, "failed to generate identity") {
+						return
+					}
+
+					svcSession, err := c1.Bind(hiddenPriv)
+					if !assertions.Nil(err, "failed to bind hidden service") {
+						return
+					}
+					defer svcSession.Close()
+
+					// Prepare client
+					t.Log("Preparing client")
+					c2, err := svc.Circuit(targets)
+					if !assertions.Nil(err, "failed to prepare circuit") {
+						return
+					}
+					defer c2.Close()
+
+					address, err := onion.HiddenAddressFromPrivKey(hiddenPriv)
+					if !assertions.Nil(err, "failed to get address from priv key") {
+						return
+					}
+
+					clientSession, err := c2.Dial(address)
+					if !assertions.Nil(err, "failed to open client session") {
+						return
+					}
+					defer clientSession.Close()
+
+					t.Log("Testing connection")
+					var payload = []byte("HELLO")
+					go func() {
+						conn, err := svcSession.Accept()
+						if !assertions.Nil(err, "failed to accept connection") {
+							return
+						}
+						defer conn.Close()
+
+						_, err = conn.Write(payload)
+						assertions.Nil(err, "failed to write payload")
+					}()
+
+					var recv = make([]byte, len(payload))
+					conn, err := clientSession.Open()
+					if !assertions.Nil(err, "failed to open client session") {
+						return
+					}
+					defer conn.Close()
+
+					_, err = conn.Read(recv)
+					if !assertions.Nil(err, "failed to read payload") {
+						return
+					}
+
+					assertions.Equal(payload, recv, "expecting a different payload")
+
+					t.Logf("Received: %s", recv)
+				},
+			},
 		}
 
-		l, err := manet.Listen(maddr)
-		if !assertions.Nil(err, "failed to listen") {
-			return
+		for _, test := range tests {
+			t.Run(test.Name, func(t *testing.T) {
+				assertions := assert.New(t)
+
+				ident, err := identity.NewKey()
+				if !assertions.Nil(err, "failed to prepare peer-1 key") {
+					return
+				}
+				client, err := libp2p.New(
+					libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/9999/quic-v1"),
+					libp2p.Identity(ident),
+				)
+				if !assertions.Nil(err, "failed to prepare client peer") {
+					return
+				}
+				defer client.Close()
+
+				currentAddrs := func() (others []peer.AddrInfo) {
+					for _, peer := range peers {
+						others = append(others, peer.Peerstore().PeerInfo(peer.ID()))
+					}
+					return others
+				}()
+
+				clientPeerDht, err := dht.New(
+					context.TODO(),
+					client,
+					dht.Mode(dht.ModeClient),
+					dht.BootstrapPeers(currentAddrs...),
+					dht.Datastore(datastore.NewMapDatastore()),
+				)
+				assertions.Nil(err, "failed to prepare client DHT")
+				defer clientPeerDht.Close()
+
+				clientSvc, err := onion.New(onion.Config{
+					PowDifficulty: 1,
+					Host:          client,
+					DHT:           clientPeerDht,
+					Bootstrap:     true,
+				})
+				assertions.Nil(err, "failed to prepare peer service")
+
+				test.Action(t, clientSvc)
+
+			})
 		}
-		defer l.Close()
-
-		var payload = []byte("HELLO")
-		go func() {
-			conn, err := l.Accept()
-			if !assertions.Nil(err, "failed to accept connection") {
-				return
-			}
-			_, err = conn.Write(payload)
-			assertions.Nil(err, "failed to write payload")
-		}()
-
-		conn, err := c.External(l.Multiaddr())
-		if !assertions.Nil(err, "failed to dial to external") {
-			return
-		}
-		defer conn.Close()
-
-		var received = make([]byte, len(payload))
-		_, err = conn.Read(received)
-		if !assertions.Nil(err, "failed to receive from listener") {
-			return
-		}
-
-		assertions.Equal(payload, received, "payload")
 	})
 }

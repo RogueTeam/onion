@@ -1,22 +1,39 @@
 package onion
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 
 	"github.com/RogueTeam/onion/p2p/dhtutils"
 	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
+	"github.com/hashicorp/yamux"
 	"github.com/ipfs/go-cid"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	p2pYamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multihash"
 )
+
+func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address string, err error) {
+	return HiddenAddressFromPubKey(priv.GetPublic())
+}
+
+func HiddenAddressFromPubKey(pub crypto.PubKey) (address string, err error) {
+	rawPub, err := crypto.MarshalPublicKey(pub)
+	if err != nil {
+		return address, fmt.Errorf("failed to marshal public key: %w", err)
+	}
+
+	rawAddress := command.DefaultHashAlgorithm().Sum(rawPub)
+	return hex.EncodeToString(rawAddress), nil
+}
 
 const (
 	BaseString           = "onionp2p"
@@ -91,6 +108,8 @@ type Service struct {
 	Host host.Host
 	// DHT service. Configured entirely by you
 	DHT *dht.IpfsDHT
+	// Hidden services the application is serving as proxy
+	HiddenServices *utils.Map[string, *yamux.Session]
 }
 
 const ProtocolId protocol.ID = "/onionp2p"
@@ -125,15 +144,16 @@ func New(cfg Config) (s *Service, err error) {
 			OutsideMode:   cfg.OutsideMode,
 			PoWDifficulty: cfg.PowDifficulty,
 		},
-		ID:   cfg.Host.ID(),
-		Host: cfg.Host,
-		DHT:  cfg.DHT,
+		ID:             cfg.Host.ID(),
+		Host:           cfg.Host,
+		DHT:            cfg.DHT,
+		HiddenServices: new(utils.Map[string, *yamux.Session]),
 	}
 
 	s.Noise, err = noise.New(
 		ProtocolId,
 		cfg.Host.Peerstore().PrivKey(cfg.Host.ID()),
-		[]upgrader.StreamMuxer{{ID: ProtocolId, Muxer: yamux.DefaultTransport}},
+		[]upgrader.StreamMuxer{{ID: ProtocolId, Muxer: p2pYamux.DefaultTransport}},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare noise transport: %w", err)
