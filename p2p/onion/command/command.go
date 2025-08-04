@@ -36,13 +36,13 @@ type (
 	}
 	Bind struct {
 		// Hex encoded public key
-		PublicKey string `json:"publicKey"`
+		HexPublicKey string `json:"publicKey"`
 		// Hex encoded signature of the DefaultHashAlgorithm of the public key
-		Signature string
+		HexSignature string
 	}
 	Dial struct {
 		// Address of the hidden service
-		Address string `json:"address"`
+		Address peer.ID `json:"address"`
 	}
 	Data struct {
 		Settings *Settings `msgpack:",omitempty"`

@@ -14,6 +14,19 @@ type Peer struct {
 	Modes set.Set[cid.Cid]
 }
 
+// Determines which Nodes in the network is serving a specific hidden address
+func (s *Service) Where(addr string) (peers []peer.AddrInfo, err error) {
+	return peers, nil
+	// ctx, cancel := utils.NewContext()
+	// defer cancel()
+	//
+	// peers, err = s.DHT.FindProviders(ctx, cid)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to find providers for cid: %w", err)
+	// }
+	// return peers, nil
+}
+
 // Lists peers compatible to the onion network.
 // This function is useful with some filtering from your part.
 // It returns a raw list of the peers using the onion protocol.

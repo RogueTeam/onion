@@ -3,21 +3,54 @@ package onion
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
 
 	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
+type HiddenServiceListener struct {
+	Noise   *noise.Transport
+	PrivKey crypto.PrivKey
+	Session *yamux.Session
+}
+
+func (h *HiddenServiceListener) Close() (err error) {
+	return h.Session.Close()
+}
+
+// Accept hidden service connections
+func (h *HiddenServiceListener) Accept() (conn io.ReadWriteCloser, err error) {
+	insecure, err := h.Session.Accept()
+	if err != nil {
+		return nil, fmt.Errorf("failed to accept connection: %w", err)
+	}
+
+	ctx, _ := utils.NewContext()
+
+	conn, err = h.Noise.SecureInbound(ctx, insecure, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to upgrade insecure: %w", err)
+	}
+	return conn, nil
+}
+
 // Binds a hidden service based on a private key
-func (c *Circuit) Bind(priv crypto.PrivKey) (session *yamux.Session, err error) {
-	rawPub, err := crypto.MarshalPublicKey(priv.GetPublic())
+func (c *Circuit) Bind(priv crypto.PrivKey) (h *HiddenServiceListener, err error) {
+	hiddenAddress, err := HiddenAddressFromPrivKey(priv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get address from private key: %w", err)
+	}
+
+	pubMarshaled, err := crypto.MarshalPublicKey(priv.GetPublic())
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
 	}
 
-	rawPubHash := command.DefaultHashAlgorithm().Sum(rawPub)
-	rawSign, err := priv.Sign(rawPubHash)
+	sign, err := priv.Sign([]byte(hiddenAddress))
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
@@ -26,8 +59,8 @@ func (c *Circuit) Bind(priv crypto.PrivKey) (session *yamux.Session, err error) 
 		Action: command.ActionBind,
 		Data: command.Data{
 			Bind: &command.Bind{
-				PublicKey: hex.EncodeToString(rawPub),
-				Signature: hex.EncodeToString(rawSign),
+				HexPublicKey: hex.EncodeToString(pubMarshaled),
+				HexSignature: hex.EncodeToString(sign),
 			},
 		},
 	}
@@ -36,9 +69,26 @@ func (c *Circuit) Bind(priv crypto.PrivKey) (session *yamux.Session, err error) 
 		return nil, fmt.Errorf("failed to send bind: %w", err)
 	}
 
-	session, err = yamux.Server(c.Active, yamux.DefaultConfig())
+	session, err := yamux.Server(c.Active, yamux.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to upgrade yamux: %w", err)
 	}
-	return session, nil
+	defer func() {
+		if err == nil {
+			return
+		}
+		session.Close()
+	}()
+
+	noiseTransport, err := noise.New(ProtocolId, priv, DefaultMuxerUpgrader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create noise tranport: %w", err)
+	}
+
+	h = &HiddenServiceListener{
+		Noise:   noiseTransport,
+		PrivKey: priv,
+		Session: session,
+	}
+	return h, nil
 }

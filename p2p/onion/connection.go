@@ -11,6 +11,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
@@ -38,7 +39,7 @@ type Connection struct {
 	// Used for identifying those peers that support External mode (Exit nodes)
 	ExternalMode bool
 	// Storage for hidden services
-	HiddenServices *utils.Map[string, *yamux.Session]
+	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
 
 // Base logic for handling the connection

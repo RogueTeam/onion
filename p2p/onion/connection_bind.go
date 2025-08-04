@@ -21,7 +21,7 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 	}
 
 	// Prepare public key ==================================
-	rawPub, err := hex.DecodeString(cmd.Data.Bind.PublicKey)
+	rawPub, err := hex.DecodeString(cmd.Data.Bind.HexPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to decode publickey: %w", err)
 	}
@@ -31,16 +31,19 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 		return fmt.Errorf("failed to unmarshal public key: %w", err)
 	}
 
-	rawHiddenAddress := command.DefaultHashAlgorithm().Sum(rawPub)
+	hiddenAddress, err := HiddenAddressFromPubKey(pub)
+	if err != nil {
+		return fmt.Errorf("failed to convert public key to hidden address: %w", err)
+	}
 
 	// Prepare signature ===================================
-	sig, err := hex.DecodeString(cmd.Data.Bind.Signature)
+	sig, err := hex.DecodeString(cmd.Data.Bind.HexSignature)
 	if err != nil {
 		return fmt.Errorf("failed to decode signature: %w", err)
 	}
 
 	// Validate signature ==================================
-	valid, err := pub.Verify(rawHiddenAddress, sig)
+	valid, err := pub.Verify([]byte(hiddenAddress), sig)
 	if err != nil {
 		return fmt.Errorf("failed to verify publickey signature: %w", err)
 	}
@@ -52,7 +55,7 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cid, err := createCID(rawHiddenAddress)
+	cid, err := createCID(hiddenAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create cid from pub hash: %w", err)
 	}
@@ -69,9 +72,8 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 	}
 	defer session.Close()
 
-	pubHash := hex.EncodeToString(rawHiddenAddress)
-	c.HiddenServices.Store(pubHash, session)
-	defer c.HiddenServices.Delete(pubHash)
+	c.HiddenServices.Store(hiddenAddress, session)
+	defer c.HiddenServices.Delete(hiddenAddress)
 
 	// Wait until caller closes. This will prevent corruption of the pipeline
 	<-session.CloseChan()

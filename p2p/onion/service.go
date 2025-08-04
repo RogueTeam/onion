@@ -1,7 +1,6 @@
 package onion
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -16,23 +15,20 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	p2pYamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	yamuxp2p "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multihash"
 )
 
-func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address string, err error) {
-	return HiddenAddressFromPubKey(priv.GetPublic())
+var DefaultMuxerUpgrader = []upgrader.StreamMuxer{{ID: ProtocolId, Muxer: yamuxp2p.DefaultTransport}}
+
+func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address peer.ID, err error) {
+	return peer.IDFromPrivateKey(priv)
 }
 
-func HiddenAddressFromPubKey(pub crypto.PubKey) (address string, err error) {
-	rawPub, err := crypto.MarshalPublicKey(pub)
-	if err != nil {
-		return address, fmt.Errorf("failed to marshal public key: %w", err)
-	}
-
-	rawAddress := command.DefaultHashAlgorithm().Sum(rawPub)
-	return hex.EncodeToString(rawAddress), nil
+func HiddenAddressFromPubKey(pub crypto.PubKey) (address peer.ID, err error) {
+	return peer.IDFromPublicKey(pub)
 }
 
 const (
@@ -64,7 +60,7 @@ func init() {
 	log.Println(OutsideModeCidString)
 }
 
-func createCID[T string | []byte](data T) (cid.Cid, error) {
+func createCID[T ~string | ~[]byte](data T) (cid.Cid, error) {
 	mh, err := multihash.Sum([]byte(data), multihash.SHA2_256, -1)
 	if err != nil {
 		return cid.Cid{}, err
@@ -109,7 +105,7 @@ type Service struct {
 	// DHT service. Configured entirely by you
 	DHT *dht.IpfsDHT
 	// Hidden services the application is serving as proxy
-	HiddenServices *utils.Map[string, *yamux.Session]
+	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
 
 const ProtocolId protocol.ID = "/onionp2p"
@@ -147,7 +143,7 @@ func New(cfg Config) (s *Service, err error) {
 		ID:             cfg.Host.ID(),
 		Host:           cfg.Host,
 		DHT:            cfg.DHT,
-		HiddenServices: new(utils.Map[string, *yamux.Session]),
+		HiddenServices: new(utils.Map[peer.ID, *yamux.Session]),
 	}
 
 	s.Noise, err = noise.New(
