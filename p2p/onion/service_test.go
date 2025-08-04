@@ -142,7 +142,7 @@ func Test_Integration(t *testing.T) {
 				},
 			},
 			{
-				Name: "Hidden-Service",
+				Name: "Basic HiddenService",
 				Action: func(t *testing.T, svc *onion.Service) {
 					assertions := assert.New(t)
 
@@ -213,10 +213,56 @@ func Test_Integration(t *testing.T) {
 					t.Logf("Received: %s", recv)
 				},
 			},
+			{
+				Name: "Discover HiddenService",
+				Action: func(t *testing.T, svc *onion.Service) {
+					assertions := assert.New(t)
+
+					// Prepare listener
+					c1, err := svc.Circuit(targets)
+					if !assertions.Nil(err, "failed to prepare circuit") {
+						return
+					}
+					defer c1.Close()
+
+					hiddenPriv, err := identity.NewKey()
+					if !assertions.Nil(err, "failed to generate identity") {
+						return
+					}
+
+					svcSession, err := c1.Bind(hiddenPriv)
+					if !assertions.Nil(err, "failed to bind hidden service") {
+						return
+					}
+					defer svcSession.Close()
+
+					// Prepare client
+					t.Log("Preparing client")
+					c2, err := svc.Circuit(targets)
+					if !assertions.Nil(err, "failed to prepare circuit") {
+						return
+					}
+					defer c2.Close()
+
+					address, err := onion.HiddenAddressFromPrivKey(hiddenPriv)
+					if !assertions.Nil(err, "failed to get address") {
+						return
+					}
+
+					// time.Sleep(5 * time.Second)
+					peers, err := svc.Where(address)
+					if !assertions.Nil(err, "failed to find peers") {
+						return
+					}
+					assertions.GreaterOrEqual(len(peers), 1, "no peers found")
+				},
+			},
 		}
 
 		for _, test := range tests {
 			t.Run(test.Name, func(t *testing.T) {
+				// 	t.Parallel()
+
 				assertions := assert.New(t)
 
 				ident, err := identity.NewKey()
@@ -224,7 +270,7 @@ func Test_Integration(t *testing.T) {
 					return
 				}
 				client, err := libp2p.New(
-					libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/9999/quic-v1"),
+					libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/0/quic-v1"),
 					libp2p.Identity(ident),
 				)
 				if !assertions.Nil(err, "failed to prepare client peer") {

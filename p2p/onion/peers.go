@@ -15,16 +15,20 @@ type Peer struct {
 }
 
 // Determines which Nodes in the network is serving a specific hidden address
-func (s *Service) Where(addr string) (peers []peer.AddrInfo, err error) {
+func (s *Service) Where(addr peer.ID) (peers []peer.AddrInfo, err error) {
+	ctx, cancel := utils.NewContext()
+	defer cancel()
+
+	cid, err := createCID(addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to crearte CID: %w", err)
+	}
+
+	peers, err = s.DHT.FindProviders(ctx, cid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find providers for cid: %w", err)
+	}
 	return peers, nil
-	// ctx, cancel := utils.NewContext()
-	// defer cancel()
-	//
-	// peers, err = s.DHT.FindProviders(ctx, cid)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to find providers for cid: %w", err)
-	// }
-	// return peers, nil
 }
 
 // Lists peers compatible to the onion network.
