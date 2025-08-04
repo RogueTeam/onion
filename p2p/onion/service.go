@@ -7,16 +7,29 @@ import (
 	"github.com/RogueTeam/onion/p2p/dhtutils"
 	"github.com/RogueTeam/onion/p2p/onion/command"
 	"github.com/RogueTeam/onion/utils"
+	"github.com/hashicorp/yamux"
 	"github.com/ipfs/go-cid"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	p2pYamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	yamuxp2p "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multihash"
 )
+
+var DefaultMuxerUpgrader = []upgrader.StreamMuxer{{ID: ProtocolId, Muxer: yamuxp2p.DefaultTransport}}
+
+func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address peer.ID, err error) {
+	return peer.IDFromPrivateKey(priv)
+}
+
+func HiddenAddressFromPubKey(pub crypto.PubKey) (address peer.ID, err error) {
+	return peer.IDFromPublicKey(pub)
+}
 
 const (
 	BaseString           = "onionp2p"
@@ -47,7 +60,7 @@ func init() {
 	log.Println(OutsideModeCidString)
 }
 
-func createCID[T string | []byte](data T) (cid.Cid, error) {
+func createCID[T ~string | ~[]byte](data T) (cid.Cid, error) {
 	mh, err := multihash.Sum([]byte(data), multihash.SHA2_256, -1)
 	if err != nil {
 		return cid.Cid{}, err
@@ -91,6 +104,8 @@ type Service struct {
 	Host host.Host
 	// DHT service. Configured entirely by you
 	DHT *dht.IpfsDHT
+	// Hidden services the application is serving as proxy
+	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
 
 const ProtocolId protocol.ID = "/onionp2p"
@@ -125,15 +140,16 @@ func New(cfg Config) (s *Service, err error) {
 			OutsideMode:   cfg.OutsideMode,
 			PoWDifficulty: cfg.PowDifficulty,
 		},
-		ID:   cfg.Host.ID(),
-		Host: cfg.Host,
-		DHT:  cfg.DHT,
+		ID:             cfg.Host.ID(),
+		Host:           cfg.Host,
+		DHT:            cfg.DHT,
+		HiddenServices: new(utils.Map[peer.ID, *yamux.Session]),
 	}
 
 	s.Noise, err = noise.New(
 		ProtocolId,
 		cfg.Host.Peerstore().PrivKey(cfg.Host.ID()),
-		[]upgrader.StreamMuxer{{ID: ProtocolId, Muxer: yamux.DefaultTransport}},
+		[]upgrader.StreamMuxer{{ID: ProtocolId, Muxer: p2pYamux.DefaultTransport}},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare noise transport: %w", err)

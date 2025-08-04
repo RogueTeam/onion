@@ -18,7 +18,9 @@ While Tor and I2P offer robust solutions for anonymous networking, their powerfu
 
 - [x] Exit nodes
 
-- [ ] Hidden services
+- [X] Hidden services
+
+- [ ] CLI
 
 ## Licensing
 
