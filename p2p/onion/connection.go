@@ -6,9 +6,12 @@ import (
 
 	"github.com/RogueTeam/onion/p2p/log"
 	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/utils"
+	"github.com/hashicorp/yamux"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
@@ -35,6 +38,8 @@ type Connection struct {
 	Secured bool
 	// Used for identifying those peers that support External mode (Exit nodes)
 	ExternalMode bool
+	// Storage for hidden services
+	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
 
 // Base logic for handling the connection
@@ -77,7 +82,16 @@ func (c *Connection) Handle() (err error) {
 			if err != nil {
 				return fmt.Errorf("failed to handle external: %w", err)
 			}
-			break
+		case command.ActionBind:
+			err = c.Bind(&cmd)
+			if err != nil {
+				return fmt.Errorf("failed to handle bind: %w", err)
+			}
+		case command.ActionDial:
+			err = c.Dial(&cmd)
+			if err != nil {
+				return fmt.Errorf("failed to handle bind: %w", err)
+			}
 		default:
 			return fmt.Errorf("unknown command: %s", cmd.Action.String())
 		}

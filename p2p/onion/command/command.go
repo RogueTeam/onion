@@ -34,11 +34,23 @@ type (
 	External struct {
 		Address multiaddr.Multiaddr `json:"address"`
 	}
+	Bind struct {
+		// Hex encoded public key
+		HexPublicKey string `json:"publicKey"`
+		// Hex encoded signature of the DefaultHashAlgorithm of the public key
+		HexSignature string
+	}
+	Dial struct {
+		// Address of the hidden service
+		Address peer.ID `json:"address"`
+	}
 	Data struct {
+		Settings *Settings `msgpack:",omitempty"`
 		Noise    *Noise    `msgpack:",omitempty"`
 		Extend   *Extend   `msgpack:",omitempty"`
 		External *External `msgpack:",omitempty"`
-		Settings *Settings `msgpack:",omitempty"`
+		Bind     *Bind     `msgpack:",omitempty"`
+		Dial     *Dial     `msgpack:",omitempty"`
 	}
 	Command struct {
 		Action   Action
@@ -60,6 +72,10 @@ const (
 	ActionExtend
 	// Connects to a remote service
 	ActionExternal
+	// Bind a hidden service
+	ActionBind
+	// Dials to a hidden service
+	ActionDial
 )
 
 func (a Action) String() (s string) {
