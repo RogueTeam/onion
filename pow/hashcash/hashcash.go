@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"math"
 	"math/big"
 	"math/bits"
 	"strconv"
@@ -16,21 +17,53 @@ import (
 	"time"
 )
 
-const (
-	BaseDifficulty = 0
-	GrowthFactor   = 1
-)
-
 var DefaultHashAlgorithm = sha3.New512
 
+const DefaultMaxDifficulty = 32 // Can be modified by the compiler
+
 func SqrtDifficulty(algo hash.Hash, peers int64) (x uint64) {
-	var maxDifficulty = uint64(algo.Size() * 8)
+	const (
+		BaseDifficulty = 0
+		GrowthFactor   = 2
+	)
+
+	var maxDifficulty uint64
+	if DefaultMaxDifficulty == 0 {
+		maxDifficulty = uint64(algo.Size() * 8)
+	} else {
+		maxDifficulty = DefaultMaxDifficulty
+	}
 
 	a := big.NewInt(0).Sqrt(big.NewInt(peers))
 	b := a.Mul(a, big.NewInt(GrowthFactor))
 	c := b.Add(b, big.NewInt(BaseDifficulty))
 
 	x = c.Uint64()
+	if x > maxDifficulty {
+		return maxDifficulty
+	}
+	return x
+}
+
+func LogDifficulty(algo hash.Hash, peers int64) (x uint64) {
+	const (
+		BaseDifficulty = 0
+		GrowthFactor   = 2
+	)
+
+	var maxDifficulty uint64
+	if DefaultMaxDifficulty == 0 {
+		maxDifficulty = uint64(algo.Size() * 8)
+	} else {
+		maxDifficulty = DefaultMaxDifficulty
+	}
+
+	a := math.Log(float64(peers))
+	b := big.NewFloat(a)
+	c := b.Mul(b, big.NewFloat(GrowthFactor))
+	d := c.Add(c, big.NewFloat(BaseDifficulty))
+
+	x, _ = d.Uint64()
 	if x > maxDifficulty {
 		return maxDifficulty
 	}
