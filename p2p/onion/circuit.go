@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -22,7 +22,7 @@ type Circuit struct {
 	// Ordered list of the peers chained into the circuit
 	OrderedPeers []peer.ID
 	// Settings for each peer of the circuit
-	Settings map[peer.ID]*command.Settings
+	Settings map[peer.ID]*message.Settings
 	// Back reference to the Service
 	Service *Service
 	// Root streaming used only for the first node of the circuit.
@@ -54,7 +54,7 @@ func (s *Service) Circuit(peers []peer.ID) (c *Circuit, err error) {
 	}
 
 	c = &Circuit{
-		Settings: make(map[peer.ID]*command.Settings),
+		Settings: make(map[peer.ID]*message.Settings),
 		Service:  s,
 	}
 	for _, peerId := range peers {

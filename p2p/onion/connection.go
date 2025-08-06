@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/log"
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -24,7 +24,7 @@ type Connection struct {
 	// net.Conn compatible interface of the stream or the noise channel
 	Conn net.Conn
 	// Our Settings
-	Settings *command.Settings
+	Settings *message.Settings
 	// Raw Stream of the connection
 	Stream network.Stream
 	// Logger for pretty printing
@@ -33,7 +33,7 @@ type Connection struct {
 	// This allows the peers use untrusted nodes and validate
 	// them to be who they are
 	Noise *noise.Transport
-	// No other command can be used if the connection is not firstly
+	// No other msg can be used if the connection is not firstly
 	// secured using the noise channel
 	Secured bool
 	// Used for identifying those peers that support External mode (Exit nodes)
@@ -45,9 +45,8 @@ type Connection struct {
 // Base logic for handling the connection
 func (c *Connection) Handle() (err error) {
 	// Send Settings
-	var settings = command.Command{
-		Action: command.ActionSettings,
-		Data: command.Data{
+	var settings = message.Message{
+		Data: message.Data{
 			Settings: c.Settings,
 		},
 	}
@@ -58,42 +57,42 @@ func (c *Connection) Handle() (err error) {
 	}
 	//
 
-	var cmd command.Command
+	var msg message.Message
 	for {
-		err = cmd.Recv(c.Conn, c.Settings)
+		err = msg.Recv(c.Conn, c.Settings)
 		if err != nil {
-			c.Logger.Log(log.LogLevelError, "READING COMMAND: %v", err)
+			c.Logger.Log(log.LogLevelError, "READING MSG: %v", err)
 			return
 		}
 
-		switch cmd.Action {
-		case command.ActionNoise:
-			err = c.UpgradeToNoise(&cmd)
+		switch {
+		case msg.Data.Noise != nil:
+			err = c.UpgradeToNoise(&msg)
 			if err != nil {
-				return fmt.Errorf("failed to handle noise command: %w", err)
+				return fmt.Errorf("failed to handle noise msg: %w", err)
 			}
-		case command.ActionExtend:
-			err = c.Extend(&cmd)
+		case msg.Data.Extend != nil:
+			err = c.Extend(&msg)
 			if err != nil {
 				return fmt.Errorf("failed to handle dial: %w", err)
 			}
-		case command.ActionExternal:
-			err = c.External(&cmd)
+		case msg.Data.External != nil:
+			err = c.External(&msg)
 			if err != nil {
 				return fmt.Errorf("failed to handle external: %w", err)
 			}
-		case command.ActionBind:
-			err = c.Bind(&cmd)
+		case msg.Data.Bind != nil:
+			err = c.Bind(&msg)
 			if err != nil {
 				return fmt.Errorf("failed to handle bind: %w", err)
 			}
-		case command.ActionDial:
-			err = c.Dial(&cmd)
+		case msg.Data.Dial != nil:
+			err = c.Dial(&msg)
 			if err != nil {
 				return fmt.Errorf("failed to handle bind: %w", err)
 			}
 		default:
-			return fmt.Errorf("unknown command: %s", cmd.Action.String())
+			return fmt.Errorf("invalid msg received")
 		}
 	}
 }

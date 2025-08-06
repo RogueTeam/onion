@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/RogueTeam/onion/p2p/dhtutils"
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
@@ -73,7 +73,7 @@ func CidFromData[T ~string | ~[]byte](data T) (cid.Cid, error) {
 }
 
 // Empty settings
-var DefaultSettings = &command.Settings{}
+var DefaultSettings = &message.Settings{}
 
 type Config struct {
 	// LIBP2P host already listening and running
@@ -142,13 +142,13 @@ type Service struct {
 
 const ProtocolId protocol.ID = "/onionp2p/0.0.1"
 
-// Settings exposed to connected peers in order to successfully handshake and authenticate commands
+// Settings exposed to connected peers in order to successfully handshake and authenticate msgs
 // defered s.Connection.Add(-1) should be called to ensure non impossible pow difficulty
-func (s *Service) Settings() (settings *command.Settings) {
+func (s *Service) Settings() (settings *message.Settings) {
 	k := s.Connections.Add(1)
 	diff := hashcash.SqrtDifficulty(hashcash.DefaultHashAlgorithm(), k)
 	log.Println("DIFF", k, diff)
-	return &command.Settings{
+	return &message.Settings{
 		OutsideMode:   s.OutsideMode,
 		PoWDifficulty: diff,
 	}

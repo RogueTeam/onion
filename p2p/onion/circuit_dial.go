@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/RogueTeam/onion/p2p/identity"
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -41,10 +41,9 @@ func (h *HiddenServiceConnection) Open() (conn io.ReadWriteCloser, err error) {
 // The circuit should be constructed in order to force the last node be the one advertising the service.
 // If not, the connection will fail
 func (c *Circuit) Dial(address peer.ID) (hidden *HiddenServiceConnection, err error) {
-	var dial = command.Command{
-		Action: command.ActionDial,
-		Data: command.Data{
-			Dial: &command.Dial{
+	var dial = message.Message{
+		Data: message.Data{
+			Dial: &message.Dial{
 				Address: address,
 			},
 		},
