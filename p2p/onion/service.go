@@ -109,14 +109,16 @@ func New(cfg Config) (s *Service, err error) {
 	}
 
 	// Notify to the network the service is available
-	err = cfg.DHT.Provide(ctx, RelayModeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to provide relay cid: %w", err)
-	}
-	if cfg.OutsideMode {
-		err = cfg.DHT.Provide(ctx, OutsideModeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
+	if !cfg.HiddenMode {
+		err = cfg.DHT.Provide(ctx, RelayModeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
 		if err != nil {
-			return nil, fmt.Errorf("failed to provide outside node cid: %w", err)
+			return nil, fmt.Errorf("failed to provide relay cid: %w", err)
+		}
+		if cfg.OutsideMode {
+			err = cfg.DHT.Provide(ctx, OutsideModeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
+			if err != nil {
+				return nil, fmt.Errorf("failed to provide outside node cid: %w", err)
+			}
 		}
 	}
 
