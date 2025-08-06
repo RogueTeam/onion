@@ -3,9 +3,12 @@ package onion
 import (
 	"fmt"
 	"log"
+	"sync/atomic"
+	"time"
 
 	"github.com/RogueTeam/onion/p2p/dhtutils"
 	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
 	"github.com/ipfs/go-cid"
@@ -18,6 +21,7 @@ import (
 	yamuxp2p "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -56,25 +60,22 @@ func init() {
 		log.Fatal(err)
 	}
 
-	log.Println(RelayModeCidString)
-	log.Println(OutsideModeCidString)
 }
 
 func createCID[T ~string | ~[]byte](data T) (cid.Cid, error) {
-	mh, err := multihash.Sum([]byte(data), multihash.SHA2_256, -1)
+	bytes := []byte(data)
+
+	mh, err := multihash.Sum(bytes, multihash.SHA3_512, -1)
 	if err != nil {
-		return cid.Cid{}, err
+		return cid.Cid{}, fmt.Errorf("failed to hash sum: %w", err)
 	}
-	return cid.NewCidV1(cid.DagCBOR, mh), nil
+	return cid.NewCidV1(uint64(multicodec.DagCbor), mh), nil
 }
 
 // Empty settings
 var DefaultSettings = &command.Settings{}
 
 type Config struct {
-	// Difficulty of the Proof Of Work
-	// Higher number will prevent span bots but will make harder to peers to use the node
-	PowDifficulty uint64
 	// LIBP2P host already listening and running
 	Host host.Host
 	// DHT instance already running
@@ -89,13 +90,42 @@ type Config struct {
 	// This basically connects the node into a proxy to the clearnet
 	// Just like Tor's Exit nodes.
 	OutsideMode bool
+	// Time To Live
+	TTL time.Duration
+}
+
+func (c Config) defaults() (cfg Config) {
+	if c.TTL == 0 {
+		c.TTL = time.Minute
+	}
+	return c
+}
+
+func (c Config) WithHost(host host.Host) (cfg Config) {
+	c.Host = host
+	return c
+}
+
+func (c Config) WithDHT(d *dht.IpfsDHT) (cfg Config) {
+	c.DHT = d
+	return c
+}
+
+func DefaultConfig() (cfg Config) {
+	return Config{
+		Bootstrap:   true,
+		HiddenMode:  false,
+		OutsideMode: false,
+		TTL:         time.Minute,
+	}
 }
 
 // You could try to setup your own service instance by setting this fields but the
 // "New" function is a plus helper for configuring everything
 type Service struct {
-	// Settings exposed to connected peers in order to successfully handshake and authenticate commands
-	Settings command.Settings
+	// Counter of the number of active connections
+	// This is used for calculating the PoW difficulty
+	Connections atomic.Int64
 	// Id of the peer
 	ID peer.ID
 	// Noise upgrader. Used for preventing relays from sniffing your traffic.
@@ -104,15 +134,53 @@ type Service struct {
 	Host host.Host
 	// DHT service. Configured entirely by you
 	DHT *dht.IpfsDHT
+	// Work in outside mode allowing connections outside the network
+	OutsideMode bool
 	// Hidden services the application is serving as proxy
 	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
 
-const ProtocolId protocol.ID = "/onionp2p"
+const ProtocolId protocol.ID = "/onionp2p/0.0.1"
+
+// Settings exposed to connected peers in order to successfully handshake and authenticate commands
+// defered s.Connection.Add(-1) should be called to ensure non impossible pow difficulty
+func (s *Service) Settings() (settings *command.Settings) {
+	k := s.Connections.Add(1)
+	diff := hashcash.SqrtDifficulty(hashcash.DefaultHashAlgorithm(), k)
+	log.Println("DIFF", k, diff)
+	return &command.Settings{
+		OutsideMode:   s.OutsideMode,
+		PoWDifficulty: diff,
+	}
+}
+
+func PromoteService(outsideMode bool, d *dht.IpfsDHT) (doContinue bool) {
+	ctx, cancel := utils.NewContext()
+	defer cancel()
+	err := d.Provide(ctx, RelayModeP2PCid, len(d.RoutingTable().ListPeers()) > 0)
+	if err != nil {
+		log.Printf("failed to provide relay cid: %v", err)
+		return false
+	}
+
+	if outsideMode {
+		ctx, cancel := utils.NewContext()
+		defer cancel()
+
+		err := d.Provide(ctx, OutsideModeP2PCid, len(d.RoutingTable().ListPeers()) > 0)
+		if err != nil {
+			log.Printf("failed to provide outside node cid: %v", err)
+			return false
+		}
+	}
+	return true
+}
 
 // Register the service into a existing host.Host.
 // Check the docs of Config
 func New(cfg Config) (s *Service, err error) {
+	cfg = cfg.defaults()
+
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
@@ -125,23 +193,22 @@ func New(cfg Config) (s *Service, err error) {
 
 	// Notify to the network the service is available
 	if !cfg.HiddenMode {
-		err = cfg.DHT.Provide(ctx, RelayModeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to provide relay cid: %w", err)
-		}
-		if cfg.OutsideMode {
-			err = cfg.DHT.Provide(ctx, OutsideModeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
-			if err != nil {
-				return nil, fmt.Errorf("failed to provide outside node cid: %w", err)
+		go func() {
+			ticker := time.NewTicker(cfg.TTL)
+			defer ticker.Stop()
+
+			for {
+				doContinue := PromoteService(cfg.OutsideMode, cfg.DHT)
+				if !doContinue {
+					return
+				}
+				<-ticker.C
 			}
-		}
+		}()
 	}
 
 	s = &Service{
-		Settings: command.Settings{
-			OutsideMode:   cfg.OutsideMode,
-			PoWDifficulty: cfg.PowDifficulty,
-		},
+		OutsideMode:    cfg.OutsideMode,
 		ID:             cfg.Host.ID(),
 		Host:           cfg.Host,
 		DHT:            cfg.DHT,

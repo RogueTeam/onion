@@ -3,6 +3,7 @@ package hashcash
 import (
 	"bytes"
 	"context"
+	"crypto/sha3"
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
@@ -14,6 +15,27 @@ import (
 	"strings"
 	"time"
 )
+
+const (
+	BaseDifficulty = 0
+	GrowthFactor   = 1
+)
+
+var DefaultHashAlgorithm = sha3.New512
+
+func SqrtDifficulty(algo hash.Hash, peers int64) (x uint64) {
+	var maxDifficulty = uint64(algo.Size() * 8)
+
+	a := big.NewInt(0).Sqrt(big.NewInt(peers))
+	b := a.Mul(a, big.NewInt(GrowthFactor))
+	c := b.Add(b, big.NewInt(BaseDifficulty))
+
+	x = c.Uint64()
+	if x > maxDifficulty {
+		return maxDifficulty
+	}
+	return x
+}
 
 var countLeadingBitsCbytes = []int{8, 4, 2, 1}
 

@@ -18,7 +18,7 @@ func (c *Connection) External(cmd *command.Command) (err error) {
 	if cmd.Data.External == nil {
 		return errors.New("external not passed")
 	}
-	if !c.ExternalMode {
+	if !c.OutsideMode {
 		return errors.New("this peer doesn't support external mode")
 	}
 

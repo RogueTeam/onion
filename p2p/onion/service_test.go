@@ -76,11 +76,10 @@ func Test_Integration(t *testing.T) {
 			dhts = append(dhts, peerDht)
 
 			svc, err := onion.New(onion.Config{
-				PowDifficulty: 1,
-				Host:          host,
-				DHT:           peerDht,
-				Bootstrap:     index != 0,
-				OutsideMode:   true,
+				Host:        host,
+				DHT:         peerDht,
+				Bootstrap:   index != 0,
+				OutsideMode: true,
 			})
 			assertions.Nil(err, "failed to prepare peer service")
 			svcs = append(svcs, svc)
@@ -295,12 +294,9 @@ func Test_Integration(t *testing.T) {
 				assertions.Nil(err, "failed to prepare client DHT")
 				defer clientPeerDht.Close()
 
-				clientSvc, err := onion.New(onion.Config{
-					PowDifficulty: 1,
-					Host:          client,
-					DHT:           clientPeerDht,
-					Bootstrap:     true,
-				})
+				clientSvc, err := onion.New(
+					onion.DefaultConfig().WithHost(client).WithDHT(clientPeerDht),
+				)
 				assertions.Nil(err, "failed to prepare peer service")
 
 				test.Action(t, clientSvc)

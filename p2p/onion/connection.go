@@ -24,7 +24,7 @@ type Connection struct {
 	// net.Conn compatible interface of the stream or the noise channel
 	Conn net.Conn
 	// Our Settings
-	Settings command.Settings
+	Settings *command.Settings
 	// Raw Stream of the connection
 	Stream network.Stream
 	// Logger for pretty printing
@@ -37,7 +37,7 @@ type Connection struct {
 	// secured using the noise channel
 	Secured bool
 	// Used for identifying those peers that support External mode (Exit nodes)
-	ExternalMode bool
+	OutsideMode bool
 	// Storage for hidden services
 	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
@@ -48,7 +48,7 @@ func (c *Connection) Handle() (err error) {
 	var settings = command.Command{
 		Action: command.ActionSettings,
 		Data: command.Data{
-			Settings: &c.Settings,
+			Settings: c.Settings,
 		},
 	}
 	err = settings.Send(c.Conn, DefaultSettings)
@@ -60,7 +60,7 @@ func (c *Connection) Handle() (err error) {
 
 	var cmd command.Command
 	for {
-		err = cmd.Recv(c.Conn, &c.Settings)
+		err = cmd.Recv(c.Conn, c.Settings)
 		if err != nil {
 			c.Logger.Log(log.LogLevelError, "READING COMMAND: %v", err)
 			return

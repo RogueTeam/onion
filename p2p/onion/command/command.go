@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -15,8 +14,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/vmihailenco/msgpack/v5"
 )
-
-var DefaultHashAlgorithm = sha512.New512_256
 
 const (
 	DefaultSaltLength = 64
@@ -109,7 +106,7 @@ func (cmd *Command) Recv(r io.Reader, settings *Settings) (err error) {
 		return fmt.Errorf("failed to marshal data into payload: %w", err)
 	}
 
-	err = hashcash.VerifyWithDifficultyAndPayload(DefaultHashAlgorithm(), cmd.Hashcash, settings.PoWDifficulty, hex.EncodeToString(payload))
+	err = hashcash.VerifyWithDifficultyAndPayload(hashcash.DefaultHashAlgorithm(), cmd.Hashcash, settings.PoWDifficulty, hex.EncodeToString(payload))
 	if err != nil {
 		return fmt.Errorf("failed to verify hashcash: %w", err)
 	}
@@ -126,7 +123,7 @@ func (cmd *Command) Send(w io.Writer, settings *Settings) (err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cmd.Hashcash, err = hashcash.New(ctx, DefaultHashAlgorithm(), settings.PoWDifficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
+	cmd.Hashcash, err = hashcash.New(ctx, hashcash.DefaultHashAlgorithm(), settings.PoWDifficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
 	if err != nil {
 		return fmt.Errorf("failed to calculate hashcash: %w", err)
 	}

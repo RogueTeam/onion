@@ -10,20 +10,24 @@ import (
 func (s *Service) StreamHandler(stream network.Stream) {
 	defer stream.Close()
 
+	settings := s.Settings()
+	defer s.Connections.Add(-1)
+
 	conn := Connection{
 		Host:     s.Host,
 		DHT:      s.DHT,
 		Conn:     &NetConnStream{Stream: stream},
-		Settings: s.Settings,
+		Settings: settings,
 		Stream:   stream,
 		Logger: log.Logger{
 			PeerID: stream.Conn().RemotePeer(),
 		},
 		Noise:          s.Noise,
 		Secured:        false,
-		ExternalMode:   s.Settings.OutsideMode,
+		OutsideMode:    s.OutsideMode,
 		HiddenServices: s.HiddenServices,
 	}
+
 	err := conn.Handle()
 	if err != nil {
 		conn.Logger.Log(log.LogLevelError, "failed to handle peer connection: %v", err)

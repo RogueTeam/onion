@@ -15,6 +15,16 @@ import (
 	"golang.org/x/net/context"
 )
 
+func Test_Difficulty(t *testing.T) {
+	tests := []int64{1, 10, 100, 1_000, 10_000, 100_000}
+	for _, test := range tests {
+		t.Run(fmt.Sprint(test), func(t *testing.T) {
+			r := hashcash.SqrtDifficulty(hashcash.DefaultHashAlgorithm(), test)
+			t.Logf("Size: %d = %d", test, r)
+		})
+	}
+}
+
 func Test_CountLeadingBits(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
 		type Test struct {
