@@ -42,34 +42,15 @@ const (
 )
 
 var (
-	RelayModeP2PCid   cid.Cid
-	OutsideModeP2PCid cid.Cid
+	RelayModeP2PCid   cid.Cid = CidFromData(RelayModeCidString)
+	OutsideModeP2PCid cid.Cid = CidFromData(OutsideModeCidString)
 )
 
-// Initialize the CIDs used to find onion relays
-// These are hardcoded and area persistent cross boots
-func init() {
-	var err error
-	RelayModeP2PCid, err = CidFromData(RelayModeCidString)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	OutsideModeP2PCid, err = CidFromData(OutsideModeCidString)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-}
-
-func CidFromData[T ~string | ~[]byte](data T) (cid.Cid, error) {
+func CidFromData[T ~string | ~[]byte](data T) cid.Cid {
 	bytes := []byte(data)
 
-	mh, err := multihash.Sum(bytes, multihash.SHA3_512, -1)
-	if err != nil {
-		return cid.Cid{}, fmt.Errorf("failed to hash sum: %w", err)
-	}
-	return cid.NewCidV1(uint64(multicodec.DagCbor), mh), nil
+	mh, _ := multihash.Sum(bytes, multihash.SHA3_512, -1)
+	return cid.NewCidV1(uint64(multicodec.DagCbor), mh)
 }
 
 // Empty settings
@@ -147,7 +128,6 @@ const ProtocolId protocol.ID = "/onionp2p/0.0.1"
 func (s *Service) Settings() (settings *message.Settings) {
 	k := s.Connections.Add(1)
 	diff := hashcash.SqrtDifficulty(hashcash.DefaultHashAlgorithm(), k)
-	log.Println("DIFF", k, diff)
 	return &message.Settings{
 		OutsideMode:   s.OutsideMode,
 		PoWDifficulty: diff,

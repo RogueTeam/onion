@@ -44,19 +44,22 @@ type (
 		// Address of the hidden service
 		Address peer.ID `json:"address"`
 	}
-	// DHT msg used for querying anonymously the IPFS DHT without revealing who is doing it
-	DHT struct {
+	// HiddenDHT msg used for querying anonymously the IPFS HiddenDHT without revealing who is doing it
+	HiddenDHT struct {
 		Cid cid.Cid // Target Cid requested
 	}
-	DHTResponse struct{}
-	Data        struct {
-		Settings *Settings `msgpack:",omitempty"`
-		Noise    *Noise    `msgpack:",omitempty"`
-		Extend   *Extend   `msgpack:",omitempty"`
-		External *External `msgpack:",omitempty"`
-		Bind     *Bind     `msgpack:",omitempty"`
-		Dial     *Dial     `msgpack:",omitempty"`
-		DHT      *DHT      `msgpack:",omitempty"`
+	HiddenDHTResponse struct {
+		Peers []peer.AddrInfo
+	}
+	Data struct {
+		Settings          *Settings          `msgpack:",omitempty"`
+		Noise             *Noise             `msgpack:",omitempty"`
+		Extend            *Extend            `msgpack:",omitempty"`
+		External          *External          `msgpack:",omitempty"`
+		Bind              *Bind              `msgpack:",omitempty"`
+		Dial              *Dial              `msgpack:",omitempty"`
+		HiddenDHT         *HiddenDHT         `msgpack:",omitempty"`
+		HiddenDHTResponse *HiddenDHTResponse `msgpack:",omitempty"`
 	}
 	Message struct {
 		Hashcash string

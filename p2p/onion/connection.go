@@ -91,6 +91,11 @@ func (c *Connection) Handle() (err error) {
 			if err != nil {
 				return fmt.Errorf("failed to handle bind: %w", err)
 			}
+		case msg.Data.HiddenDHT != nil:
+			err = c.HiddenDHT(&msg)
+			if err != nil {
+				return fmt.Errorf("failed to handle hidden dht: %w", err)
+			}
 		default:
 			return fmt.Errorf("invalid msg received")
 		}
