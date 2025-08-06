@@ -55,7 +55,7 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cid, err := createCID(hiddenAddress)
+	cid, err := CidFromData(hiddenAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create cid from pub hash: %w", err)
 	}

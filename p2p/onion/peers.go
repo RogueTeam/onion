@@ -19,7 +19,7 @@ func (s *Service) Where(addr peer.ID) (peers []peer.AddrInfo, err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cid, err := createCID(addr)
+	cid, err := CidFromData(addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to crearte CID: %w", err)
 	}

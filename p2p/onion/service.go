@@ -50,19 +50,19 @@ var (
 // These are hardcoded and area persistent cross boots
 func init() {
 	var err error
-	RelayModeP2PCid, err = createCID(RelayModeCidString)
+	RelayModeP2PCid, err = CidFromData(RelayModeCidString)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	OutsideModeP2PCid, err = createCID(OutsideModeCidString)
+	OutsideModeP2PCid, err = CidFromData(OutsideModeCidString)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 }
 
-func createCID[T ~string | ~[]byte](data T) (cid.Cid, error) {
+func CidFromData[T ~string | ~[]byte](data T) (cid.Cid, error) {
 	bytes := []byte(data)
 
 	mh, err := multihash.Sum(bytes, multihash.SHA3_512, -1)
