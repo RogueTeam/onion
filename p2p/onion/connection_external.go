@@ -6,23 +6,23 @@ import (
 	"io"
 
 	"github.com/RogueTeam/onion/p2p/log"
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // Handle the connection to an external service
-func (c *Connection) External(cmd *command.Command) (err error) {
+func (c *Connection) External(msg *message.Message) (err error) {
 	if !c.Secured {
 		return errors.New("connection not secured")
 	}
-	if cmd.Data.External == nil {
+	if msg.Data.External == nil {
 		return errors.New("external not passed")
 	}
-	if !c.ExternalMode {
+	if !c.OutsideMode {
 		return errors.New("this peer doesn't support external mode")
 	}
 
-	remote, err := manet.Dial(cmd.Data.External.Address)
+	remote, err := manet.Dial(msg.Data.External.Address)
 	if err != nil {
 		return fmt.Errorf("failed to dial external: %w", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -12,10 +12,9 @@ import (
 // Notice the last peer of the circuit chain should support external connections.
 // You can check this by doing the proper filtering once you called ListPeers
 func (c *Circuit) External(maddr multiaddr.Multiaddr) (conn net.Conn, err error) {
-	var external = command.Command{
-		Action: command.ActionExternal,
-		Data: command.Data{
-			External: &command.External{
+	var external = message.Message{
+		Data: message.Data{
+			External: &message.External{
 				Address: maddr,
 			},
 		},

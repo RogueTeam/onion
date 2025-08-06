@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -55,10 +55,9 @@ func (c *Circuit) Bind(priv crypto.PrivKey) (h *HiddenServiceListener, err error
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
 
-	var bind = command.Command{
-		Action: command.ActionBind,
-		Data: command.Data{
-			Bind: &command.Bind{
+	var bind = message.Message{
+		Data: message.Data{
+			Bind: &message.Bind{
 				HexPublicKey: hex.EncodeToString(pubMarshaled),
 				HexSignature: hex.EncodeToString(sign),
 			},

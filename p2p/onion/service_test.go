@@ -76,11 +76,10 @@ func Test_Integration(t *testing.T) {
 			dhts = append(dhts, peerDht)
 
 			svc, err := onion.New(onion.Config{
-				PowDifficulty: 1,
-				Host:          host,
-				DHT:           peerDht,
-				Bootstrap:     index != 0,
-				OutsideMode:   true,
+				Host:        host,
+				DHT:         peerDht,
+				Bootstrap:   index != 0,
+				OutsideMode: true,
 			})
 			assertions.Nil(err, "failed to prepare peer service")
 			svcs = append(svcs, svc)
@@ -219,18 +218,18 @@ func Test_Integration(t *testing.T) {
 					assertions := assert.New(t)
 
 					// Prepare listener
-					c1, err := svc.Circuit(targets)
+					serverCircuit, err := svc.Circuit(targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
-					defer c1.Close()
+					defer serverCircuit.Close()
 
 					hiddenPriv, err := identity.NewKey()
 					if !assertions.Nil(err, "failed to generate identity") {
 						return
 					}
 
-					svcSession, err := c1.Bind(hiddenPriv)
+					svcSession, err := serverCircuit.Bind(hiddenPriv)
 					if !assertions.Nil(err, "failed to bind hidden service") {
 						return
 					}
@@ -238,11 +237,11 @@ func Test_Integration(t *testing.T) {
 
 					// Prepare client
 					t.Log("Preparing client")
-					c2, err := svc.Circuit(targets)
+					clientCircuit, err := svc.Circuit(targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
-					defer c2.Close()
+					defer clientCircuit.Close()
 
 					address, err := onion.HiddenAddressFromPrivKey(hiddenPriv)
 					if !assertions.Nil(err, "failed to get address") {
@@ -250,7 +249,7 @@ func Test_Integration(t *testing.T) {
 					}
 
 					// time.Sleep(5 * time.Second)
-					peers, err := svc.Where(address)
+					peers, err := clientCircuit.HiddenDHT(onion.CidFromData(address))
 					if !assertions.Nil(err, "failed to find peers") {
 						return
 					}
@@ -295,12 +294,9 @@ func Test_Integration(t *testing.T) {
 				assertions.Nil(err, "failed to prepare client DHT")
 				defer clientPeerDht.Close()
 
-				clientSvc, err := onion.New(onion.Config{
-					PowDifficulty: 1,
-					Host:          client,
-					DHT:           clientPeerDht,
-					Bootstrap:     true,
-				})
+				clientSvc, err := onion.New(
+					onion.DefaultConfig().WithHost(client).WithDHT(clientPeerDht),
+				)
 				assertions.Nil(err, "failed to prepare peer service")
 
 				test.Action(t, clientSvc)

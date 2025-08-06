@@ -5,23 +5,23 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
 	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
 // Handle the bind of a hidden service
-func (c *Connection) Bind(cmd *command.Command) (err error) {
+func (c *Connection) Bind(msg *message.Message) (err error) {
 	if !c.Secured {
 		return errors.New("connection not secured")
 	}
-	if cmd.Data.Bind == nil {
+	if msg.Data.Bind == nil {
 		return errors.New("bind not passed")
 	}
 
 	// Prepare public key ==================================
-	rawPub, err := hex.DecodeString(cmd.Data.Bind.HexPublicKey)
+	rawPub, err := hex.DecodeString(msg.Data.Bind.HexPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to decode publickey: %w", err)
 	}
@@ -37,7 +37,7 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 	}
 
 	// Prepare signature ===================================
-	sig, err := hex.DecodeString(cmd.Data.Bind.HexSignature)
+	sig, err := hex.DecodeString(msg.Data.Bind.HexSignature)
 	if err != nil {
 		return fmt.Errorf("failed to decode signature: %w", err)
 	}
@@ -55,7 +55,7 @@ func (c *Connection) Bind(cmd *command.Command) (err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cid, err := createCID(hiddenAddress)
+	cid := CidFromData(hiddenAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create cid from pub hash: %w", err)
 	}

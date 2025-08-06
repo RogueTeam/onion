@@ -10,10 +10,50 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
+
+func Test_Difficulty(t *testing.T) {
+	samples := []int64{1, 10, 100, 1_000, 10_000, 100_000, 1_000_000}
+	type Test struct {
+		Name     string
+		Function func(algo hash.Hash, l int64) (n uint64)
+	}
+	tests := []Test{
+		{Name: "SQRT", Function: hashcash.SqrtDifficulty},
+		{Name: "LOGN", Function: hashcash.LogDifficulty},
+	}
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			for _, sample := range samples {
+				t.Run(fmt.Sprint(sample), func(t *testing.T) {
+					t.Parallel()
+
+					assertions := assert.New(t)
+
+					v := test.Function(hashcash.DefaultHashAlgorithm(), sample)
+					t.Logf("[%s] Size: %d = %d", test.Name, sample, v)
+
+					salt := crypto.String(64)
+					payload := crypto.String(64)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
+					defer cancel()
+
+					now := time.Now()
+					hc, err := hashcash.New(ctx, hashcash.DefaultHashAlgorithm(), v, salt, payload)
+					duration := time.Since(now)
+					assertions.Nil(err, "failed to compute hashcash")
+
+					t.Logf("[%s] Size: %d = %d; Spent: %v = %v", test.Name, sample, v, duration, hc)
+				})
+			}
+		})
+	}
+}
 
 func Test_CountLeadingBits(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {

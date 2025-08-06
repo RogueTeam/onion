@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/identity"
-	"github.com/RogueTeam/onion/p2p/onion/command"
+	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -48,10 +48,9 @@ func (c *Circuit) Extend(id peer.ID) (err error) {
 		}
 		conn = c.Active
 
-		var connInternal = command.Command{
-			Action: command.ActionExtend,
-			Data: command.Data{
-				Extend: &command.Extend{
+		var connInternal = message.Message{
+			Data: message.Data{
+				Extend: &message.Extend{
 					PeerId: id,
 				},
 			},
@@ -63,29 +62,28 @@ func (c *Circuit) Extend(id peer.ID) (err error) {
 	}
 
 	// Retrieve settings
-	var settingsCmd command.Command
-	err = settingsCmd.Recv(conn, DefaultSettings)
+	var settingsMsg message.Message
+	err = settingsMsg.Recv(conn, DefaultSettings)
 	if err != nil {
 		return fmt.Errorf("failed to receive settings msg: %w", err)
 	}
 
-	if settingsCmd.Action != command.ActionSettings || settingsCmd.Data.Settings == nil {
-		return errors.New("invalid settings command received")
+	if settingsMsg.Data.Settings == nil {
+		return errors.New("invalid settings msg received")
 	}
 
-	settings := settingsCmd.Data.Settings
+	settings := settingsMsg.Data.Settings
 	c.Settings[id] = settings
 
 	// Upgrade tunnel
-	var noiseCmd = command.Command{
-		Action: command.ActionNoise,
-		Data: command.Data{
-			Noise: &command.Noise{
+	var noiseMsg = message.Message{
+		Data: message.Data{
+			Noise: &message.Noise{
 				PeerPublicKey: pubKeyBytes,
 			},
 		},
 	}
-	err = noiseCmd.Send(conn, settings)
+	err = noiseMsg.Send(conn, settings)
 	if err != nil {
 		return fmt.Errorf("failed to send noise request: %w", err)
 	}
