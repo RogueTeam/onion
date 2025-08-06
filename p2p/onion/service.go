@@ -127,7 +127,7 @@ const ProtocolId protocol.ID = "/onionp2p/0.0.1"
 // defered s.Connection.Add(-1) should be called to ensure non impossible pow difficulty
 func (s *Service) Settings() (settings *message.Settings) {
 	k := s.Connections.Add(1)
-	diff := hashcash.SqrtDifficulty(hashcash.DefaultHashAlgorithm(), k)
+	diff := hashcash.LogDifficulty(hashcash.DefaultHashAlgorithm(), k)
 	return &message.Settings{
 		OutsideMode:   s.OutsideMode,
 		PoWDifficulty: diff,
