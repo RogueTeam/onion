@@ -20,6 +20,7 @@ import (
 	p2pYamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	yamuxp2p "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
+	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
@@ -36,14 +37,16 @@ func HiddenAddressFromPubKey(pub crypto.PubKey) (address peer.ID, err error) {
 }
 
 const (
-	BaseString           = "onionp2p"
-	RelayModeCidString   = BaseString + "-relay"
-	OutsideModeCidString = BaseString + "-outsidenode"
+	BaseString         = "onionp2p"
+	BasicNodeCidString = BaseString + "-basic"
+	RelayNodeCidString = BaseString + "-relay"
+	ExitNodeCidString  = BaseString + "-exitnode"
 )
 
 var (
-	RelayModeP2PCid   cid.Cid = CidFromData(RelayModeCidString)
-	OutsideModeP2PCid cid.Cid = CidFromData(OutsideModeCidString)
+	BasicNodeP2PCid cid.Cid = CidFromData(BasicNodeCidString)
+	RelayNodeP2PCid cid.Cid = CidFromData(RelayNodeCidString)
+	ExitNodeP2PCid  cid.Cid = CidFromData(ExitNodeCidString)
 )
 
 func CidFromData[T ~string | ~[]byte](data T) cid.Cid {
@@ -55,51 +58,6 @@ func CidFromData[T ~string | ~[]byte](data T) cid.Cid {
 
 // Empty settings
 var DefaultSettings = &message.Settings{}
-
-type Config struct {
-	// LIBP2P host already listening and running
-	Host host.Host
-	// DHT instance already running
-	DHT *dht.IpfsDHT
-	// Run the bootstrap operation
-	// When set DHT will Bootstrap and wait until there are nodes connected
-	Bootstrap bool
-	// Do not advertise this node.
-	// Make sure to run this with a Client only DHT
-	HiddenMode bool
-	// Allow connections outside the network.
-	// This basically connects the node into a proxy to the clearnet
-	// Just like Tor's Exit nodes.
-	OutsideMode bool
-	// Time To Live
-	TTL time.Duration
-}
-
-func (c Config) defaults() (cfg Config) {
-	if c.TTL == 0 {
-		c.TTL = time.Minute
-	}
-	return c
-}
-
-func (c Config) WithHost(host host.Host) (cfg Config) {
-	c.Host = host
-	return c
-}
-
-func (c Config) WithDHT(d *dht.IpfsDHT) (cfg Config) {
-	c.DHT = d
-	return c
-}
-
-func DefaultConfig() (cfg Config) {
-	return Config{
-		Bootstrap:   true,
-		HiddenMode:  false,
-		OutsideMode: false,
-		TTL:         time.Minute,
-	}
-}
 
 // You could try to setup your own service instance by setting this fields but the
 // "New" function is a plus helper for configuring everything
@@ -116,7 +74,9 @@ type Service struct {
 	// DHT service. Configured entirely by you
 	DHT *dht.IpfsDHT
 	// Work in outside mode allowing connections outside the network
-	OutsideMode bool
+	ExitNode bool
+	// Relay may be nil in case relay node was not enabled
+	Relay *relay.Relay
 	// Hidden services the application is serving as proxy
 	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
@@ -129,27 +89,38 @@ func (s *Service) Settings() (settings *message.Settings) {
 	k := s.Connections.Add(1)
 	diff := hashcash.LogDifficulty(hashcash.DefaultHashAlgorithm(), k)
 	return &message.Settings{
-		OutsideMode:   s.OutsideMode,
+		ExitNode:      s.ExitNode,
 		PoWDifficulty: diff,
 	}
 }
 
-func PromoteService(outsideMode bool, d *dht.IpfsDHT) (doContinue bool) {
+func PromoteService(cfg *Config) (doContinue bool) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
-	err := d.Provide(ctx, RelayModeP2PCid, len(d.RoutingTable().ListPeers()) > 0)
+	err := cfg.DHT.Provide(ctx, BasicNodeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
 	if err != nil {
-		log.Printf("failed to provide relay cid: %v", err)
+		log.Printf("failed to provide basic cid: %v", err)
 		return false
 	}
 
-	if outsideMode {
+	if cfg.Relay != nil {
 		ctx, cancel := utils.NewContext()
 		defer cancel()
 
-		err := d.Provide(ctx, OutsideModeP2PCid, len(d.RoutingTable().ListPeers()) > 0)
+		err := cfg.DHT.Provide(ctx, RelayNodeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
 		if err != nil {
-			log.Printf("failed to provide outside node cid: %v", err)
+			log.Printf("failed to provide relay node cid: %v", err)
+			return false
+		}
+	}
+
+	if cfg.ExitNode {
+		ctx, cancel := utils.NewContext()
+		defer cancel()
+
+		err := cfg.DHT.Provide(ctx, ExitNodeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
+		if err != nil {
+			log.Printf("failed to provide exit node cid: %v", err)
 			return false
 		}
 	}
@@ -178,7 +149,7 @@ func New(cfg Config) (s *Service, err error) {
 			defer ticker.Stop()
 
 			for {
-				doContinue := PromoteService(cfg.OutsideMode, cfg.DHT)
+				doContinue := PromoteService(&cfg)
 				if !doContinue {
 					return
 				}
@@ -188,7 +159,7 @@ func New(cfg Config) (s *Service, err error) {
 	}
 
 	s = &Service{
-		OutsideMode:    cfg.OutsideMode,
+		ExitNode:       cfg.ExitNode,
 		ID:             cfg.Host.ID(),
 		Host:           cfg.Host,
 		DHT:            cfg.DHT,

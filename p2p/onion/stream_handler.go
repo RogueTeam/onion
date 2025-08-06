@@ -24,7 +24,7 @@ func (s *Service) StreamHandler(stream network.Stream) {
 		},
 		Noise:          s.Noise,
 		Secured:        false,
-		OutsideMode:    s.OutsideMode,
+		ExitNode:       s.ExitNode,
 		HiddenServices: s.HiddenServices,
 	}
 

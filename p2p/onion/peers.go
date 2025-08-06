@@ -23,7 +23,7 @@ func (s *Service) ListPeers() (peers []*Peer, err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	relayMode, err := s.DHT.FindProviders(ctx, RelayModeP2PCid)
+	relayMode, err := s.DHT.FindProviders(ctx, BasicNodeP2PCid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find relay mode peers: %w", err)
 	}
@@ -33,11 +33,11 @@ func (s *Service) ListPeers() (peers []*Peer, err error) {
 	for _, info := range relayMode {
 		ref[info.ID] = &Peer{
 			Info:  info,
-			Modes: set.New(RelayModeP2PCid),
+			Modes: set.New(BasicNodeP2PCid),
 		}
 	}
 
-	outsideMode, err := s.DHT.FindProviders(ctx, OutsideModeP2PCid)
+	outsideMode, err := s.DHT.FindProviders(ctx, ExitNodeP2PCid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find outside mode peers: %w", err)
 	}
@@ -46,7 +46,7 @@ func (s *Service) ListPeers() (peers []*Peer, err error) {
 		if !found {
 			continue
 		}
-		entry.Modes.Add(OutsideModeP2PCid)
+		entry.Modes.Add(ExitNodeP2PCid)
 	}
 
 	peers = make([]*Peer, 0, len(ref))

@@ -37,7 +37,7 @@ type Connection struct {
 	// secured using the noise channel
 	Secured bool
 	// Used for identifying those peers that support External mode (Exit nodes)
-	OutsideMode bool
+	ExitNode bool
 	// Storage for hidden services
 	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
