@@ -23,14 +23,14 @@ func (s *Service) ListPeers() (peers []*Peer, err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	relayMode, err := s.DHT.FindProviders(ctx, BasicNodeP2PCid)
+	basicNodes, err := s.DHT.FindProviders(ctx, BasicNodeP2PCid)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find relay mode peers: %w", err)
+		return nil, fmt.Errorf("failed to find basic mode peers: %w", err)
 	}
 
 	ref := make(map[peer.ID]*Peer)
 
-	for _, info := range relayMode {
+	for _, info := range basicNodes {
 		ref[info.ID] = &Peer{
 			Info:  info,
 			Modes: set.New(BasicNodeP2PCid),

@@ -5,7 +5,6 @@ import (
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 )
 
 type Config struct {
@@ -23,16 +22,8 @@ type Config struct {
 	// This basically connects the node into a proxy to the clearnet
 	// Just like Tor's Exit nodes.
 	ExitNode bool
-	// Relay mode allows nodes without a public IP to also participate in the routing process.
-	// When a relay is passed the engine assumes the incoming connections are allowed
-	Relay *relay.Relay
 	// Time To Live
 	TTL time.Duration
-}
-
-func (c Config) WithRelay(r *relay.Relay) (cfg Config) {
-	c.Relay = r
-	return c
 }
 
 func (c Config) defaults() (cfg Config) {

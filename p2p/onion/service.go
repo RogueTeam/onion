@@ -20,7 +20,6 @@ import (
 	p2pYamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	yamuxp2p "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
-	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
@@ -39,13 +38,11 @@ func HiddenAddressFromPubKey(pub crypto.PubKey) (address peer.ID, err error) {
 const (
 	BaseString         = "onionp2p"
 	BasicNodeCidString = BaseString + "-basic"
-	RelayNodeCidString = BaseString + "-relay"
 	ExitNodeCidString  = BaseString + "-exitnode"
 )
 
 var (
 	BasicNodeP2PCid cid.Cid = CidFromData(BasicNodeCidString)
-	RelayNodeP2PCid cid.Cid = CidFromData(RelayNodeCidString)
 	ExitNodeP2PCid  cid.Cid = CidFromData(ExitNodeCidString)
 )
 
@@ -67,7 +64,7 @@ type Service struct {
 	Connections atomic.Int64
 	// Id of the peer
 	ID peer.ID
-	// Noise upgrader. Used for preventing relays from sniffing your traffic.
+	// Noise upgrader. Used for preventing node from sniffing your traffic.
 	Noise *noise.Transport
 	// Host already binding to an address
 	Host host.Host
@@ -75,8 +72,6 @@ type Service struct {
 	DHT *dht.IpfsDHT
 	// Work in outside mode allowing connections outside the network
 	ExitNode bool
-	// Relay may be nil in case relay node was not enabled
-	Relay *relay.Relay
 	// Hidden services the application is serving as proxy
 	HiddenServices *utils.Map[peer.ID, *yamux.Session]
 }
@@ -101,17 +96,6 @@ func PromoteService(cfg *Config) (doContinue bool) {
 	if err != nil {
 		log.Printf("failed to provide basic cid: %v", err)
 		return false
-	}
-
-	if cfg.Relay != nil {
-		ctx, cancel := utils.NewContext()
-		defer cancel()
-
-		err := cfg.DHT.Provide(ctx, RelayNodeP2PCid, len(cfg.DHT.RoutingTable().ListPeers()) > 0)
-		if err != nil {
-			log.Printf("failed to provide relay node cid: %v", err)
-			return false
-		}
 	}
 
 	if cfg.ExitNode {
