@@ -39,6 +39,7 @@ func Test_Integration(t *testing.T) {
 				peer.Close()
 			}
 		}()
+
 		var svcs []*onion.Service
 		for index := range ServicePeers {
 			ident, err := identity.NewKey()
@@ -47,7 +48,7 @@ func Test_Integration(t *testing.T) {
 			}
 
 			host, err := libp2p.New(
-				libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/0/quic-v1"),
+				libp2p.ListenAddrStrings("/ip4/0.0.0.0/udp/0/quic-v1"),
 				libp2p.Identity(ident),
 			)
 			if !assertions.Nil(err, "failed to prepare peer") {
@@ -76,10 +77,10 @@ func Test_Integration(t *testing.T) {
 			dhts = append(dhts, peerDht)
 
 			svc, err := onion.New(onion.Config{
-				Host:        host,
-				DHT:         peerDht,
-				Bootstrap:   index != 0,
-				OutsideMode: true,
+				Host:      host,
+				DHT:       peerDht,
+				Bootstrap: index != 0,
+				ExitNode:  true,
 			})
 			assertions.Nil(err, "failed to prepare peer service")
 			svcs = append(svcs, svc)
@@ -104,7 +105,7 @@ func Test_Integration(t *testing.T) {
 					assertions.Nil(err, "failed to prepare circuit")
 					defer c.Close()
 
-					maddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
+					maddr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
 					if !assertions.Nil(err, "failed to prepare maddr") {
 						return
 					}
@@ -260,8 +261,6 @@ func Test_Integration(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.Name, func(t *testing.T) {
-				// 	t.Parallel()
-
 				assertions := assert.New(t)
 
 				ident, err := identity.NewKey()
@@ -269,7 +268,7 @@ func Test_Integration(t *testing.T) {
 					return
 				}
 				client, err := libp2p.New(
-					libp2p.ListenAddrStrings("/ip4/127.0.0.1/udp/0/quic-v1"),
+					libp2p.ListenAddrStrings("/ip4/0.0.0.0/udp/0/quic-v1"),
 					libp2p.Identity(ident),
 				)
 				if !assertions.Nil(err, "failed to prepare client peer") {
@@ -295,7 +294,9 @@ func Test_Integration(t *testing.T) {
 				defer clientPeerDht.Close()
 
 				clientSvc, err := onion.New(
-					onion.DefaultConfig().WithHost(client).WithDHT(clientPeerDht),
+					onion.DefaultConfig().
+						WithHost(client).
+						WithDHT(clientPeerDht),
 				)
 				assertions.Nil(err, "failed to prepare peer service")
 
