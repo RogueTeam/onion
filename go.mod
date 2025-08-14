@@ -5,6 +5,7 @@ go 1.23.8
 toolchain go1.23.11
 
 require (
+	github.com/elazarl/goproxy v1.7.2
 	github.com/hashicorp/yamux v0.1.2
 	github.com/ipfs/go-cid v0.5.0
 	github.com/ipfs/go-datastore v0.8.2

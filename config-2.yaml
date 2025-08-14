@@ -1,0 +1,8 @@
+services: []
+listen-addresses:
+  - /ip4/0.0.0.0/udp/0/quic-v1
+ttl: 1m0s
+identity-location: serbero2.id
+hidden-mode: false
+exit-node: true
+bootstrap: true
