@@ -1,10 +1,10 @@
 package onion
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/RogueTeam/onion/set"
-	"github.com/RogueTeam/onion/utils"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -19,10 +19,7 @@ type Peer struct {
 // It returns a raw list of the peers using the onion protocol.
 // You could filter based on public threats, remove possible fake nodes.
 // Specific countries, etc.
-func (s *Service) ListPeers() (peers []*Peer, err error) {
-	ctx, cancel := utils.NewContext()
-	defer cancel()
-
+func (s *Service) ListPeers(ctx context.Context) (peers []*Peer, err error) {
 	basicNodes, err := s.DHT.FindProviders(ctx, BasicNodeP2PCid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find basic mode peers: %w", err)

@@ -49,7 +49,7 @@ var (
 func CidFromData[T ~string | ~[]byte](data T) cid.Cid {
 	bytes := []byte(data)
 
-	mh, _ := multihash.Sum(bytes, multihash.SHA3_512, -1)
+	mh, _ := multihash.Sum(bytes, multihash.SHA3_224, -1)
 	return cid.NewCidV1(uint64(multicodec.DagCbor), mh)
 }
 

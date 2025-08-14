@@ -1,6 +1,8 @@
 package onion
 
 import (
+	"context"
+
 	"github.com/RogueTeam/onion/p2p/log"
 	"github.com/libp2p/go-libp2p/core/network"
 )
@@ -28,7 +30,8 @@ func (s *Service) StreamHandler(stream network.Stream) {
 		HiddenServices: s.HiddenServices,
 	}
 
-	err := conn.Handle()
+	// TODO: Add some kind of limit to the connection handling
+	err := conn.Handle(context.TODO())
 	if err != nil {
 		conn.Logger.Log(log.LogLevelError, "failed to handle peer connection: %v", err)
 	}

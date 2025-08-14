@@ -33,11 +33,6 @@ func (c Config) defaults() (cfg Config) {
 	return c
 }
 
-func (c Config) WithTTL(d time.Duration) (cfg Config) {
-	c.TTL = d
-	return c
-}
-
 func (c Config) WithHost(host host.Host) (cfg Config) {
 	c.Host = host
 	return c
@@ -45,6 +40,26 @@ func (c Config) WithHost(host host.Host) (cfg Config) {
 
 func (c Config) WithDHT(d *dht.IpfsDHT) (cfg Config) {
 	c.DHT = d
+	return c
+}
+
+func (c Config) WithBootstrap(bootstrap bool) (cfg Config) {
+	c.Bootstrap = bootstrap
+	return c
+}
+
+func (c Config) WithHiddenMode(hidden bool) (cfg Config) {
+	c.HiddenMode = hidden
+	return c
+}
+
+func (c Config) WithExitNode(exit bool) (cfg Config) {
+	c.ExitNode = exit
+	return c
+}
+
+func (c Config) WithTTL(d time.Duration) (cfg Config) {
+	c.TTL = d
 	return c
 }
 

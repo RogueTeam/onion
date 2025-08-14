@@ -2,6 +2,7 @@ package message
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -9,7 +10,6 @@ import (
 	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/net/compressedtunnel"
 	"github.com/RogueTeam/onion/pow/hashcash"
-	"github.com/RogueTeam/onion/utils"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -92,15 +92,12 @@ func (m *Message) Recv(r io.Reader, settings *Settings) (err error) {
 	return nil
 }
 
-func (m *Message) Send(w io.Writer, settings *Settings) (err error) {
+func (m *Message) Send(ctx context.Context, w io.Writer, settings *Settings) (err error) {
 	// Prepare Msg
 	payload, err := msgpack.Marshal(m.Data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
-
-	ctx, cancel := utils.NewContext()
-	defer cancel()
 
 	m.Hashcash, err = hashcash.New(ctx, hashcash.DefaultHashAlgorithm(), settings.PoWDifficulty, crypto.String(DefaultSaltLength), hex.EncodeToString(payload))
 	if err != nil {

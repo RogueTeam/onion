@@ -7,6 +7,7 @@ import (
 
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion"
+	"github.com/RogueTeam/onion/utils"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -101,7 +102,10 @@ func Test_Integration(t *testing.T) {
 				Action: func(t *testing.T, svc *onion.Service) {
 					assertions := assert.New(t)
 
-					c, err := svc.Circuit(targets)
+					ctx, cancel := utils.NewContext()
+					defer cancel()
+
+					c, err := svc.Circuit(ctx, targets)
 					assertions.Nil(err, "failed to prepare circuit")
 					defer c.Close()
 
@@ -126,7 +130,7 @@ func Test_Integration(t *testing.T) {
 						assertions.Nil(err, "failed to write payload")
 					}()
 
-					conn, err := c.External(l.Multiaddr())
+					conn, err := c.External(ctx, l.Multiaddr())
 					if !assertions.Nil(err, "failed to dial to external") {
 						return
 					}
@@ -146,8 +150,11 @@ func Test_Integration(t *testing.T) {
 				Action: func(t *testing.T, svc *onion.Service) {
 					assertions := assert.New(t)
 
+					ctx, cancel := utils.NewContext()
+					defer cancel()
+
 					// Prepare listener
-					c1, err := svc.Circuit(targets)
+					c1, err := svc.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -158,7 +165,7 @@ func Test_Integration(t *testing.T) {
 						return
 					}
 
-					svcSession, err := c1.Bind(hiddenPriv)
+					svcSession, err := c1.Bind(ctx, hiddenPriv)
 					if !assertions.Nil(err, "failed to bind hidden service") {
 						return
 					}
@@ -166,7 +173,7 @@ func Test_Integration(t *testing.T) {
 
 					// Prepare client
 					t.Log("Preparing client")
-					c2, err := svc.Circuit(targets)
+					c2, err := svc.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -177,7 +184,7 @@ func Test_Integration(t *testing.T) {
 						return
 					}
 
-					clientSession, err := c2.Dial(address)
+					clientSession, err := c2.Dial(ctx, address)
 					if !assertions.Nil(err, "failed to open client session") {
 						return
 					}
@@ -197,7 +204,7 @@ func Test_Integration(t *testing.T) {
 					}()
 
 					var recv = make([]byte, len(payload))
-					conn, err := clientSession.Open()
+					conn, err := clientSession.Open(ctx)
 					if !assertions.Nil(err, "failed to open client session") {
 						return
 					}
@@ -218,8 +225,11 @@ func Test_Integration(t *testing.T) {
 				Action: func(t *testing.T, svc *onion.Service) {
 					assertions := assert.New(t)
 
+					ctx, cancel := utils.NewContext()
+					defer cancel()
+
 					// Prepare listener
-					serverCircuit, err := svc.Circuit(targets)
+					serverCircuit, err := svc.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -230,7 +240,7 @@ func Test_Integration(t *testing.T) {
 						return
 					}
 
-					svcSession, err := serverCircuit.Bind(hiddenPriv)
+					svcSession, err := serverCircuit.Bind(ctx, hiddenPriv)
 					if !assertions.Nil(err, "failed to bind hidden service") {
 						return
 					}
@@ -238,7 +248,7 @@ func Test_Integration(t *testing.T) {
 
 					// Prepare client
 					t.Log("Preparing client")
-					clientCircuit, err := svc.Circuit(targets)
+					clientCircuit, err := svc.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -250,7 +260,7 @@ func Test_Integration(t *testing.T) {
 					}
 
 					// time.Sleep(5 * time.Second)
-					peers, err := clientCircuit.HiddenDHT(onion.CidFromData(address))
+					peers, err := clientCircuit.HiddenDHT(ctx, onion.CidFromData(address))
 					if !assertions.Nil(err, "failed to find peers") {
 						return
 					}

@@ -1,6 +1,7 @@
 package onion
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -11,7 +12,7 @@ import (
 // Connect to a remote service outside the onion network.
 // Notice the last peer of the circuit chain should support external connections.
 // You can check this by doing the proper filtering once you called ListPeers
-func (c *Circuit) External(maddr multiaddr.Multiaddr) (conn net.Conn, err error) {
+func (c *Circuit) External(ctx context.Context, maddr multiaddr.Multiaddr) (conn net.Conn, err error) {
 	var external = message.Message{
 		Data: message.Data{
 			External: &message.External{
@@ -19,7 +20,7 @@ func (c *Circuit) External(maddr multiaddr.Multiaddr) (conn net.Conn, err error)
 			},
 		},
 	}
-	err = external.Send(c.Active, c.Settings[c.Current])
+	err = external.Send(ctx, c.Active, c.Settings[c.Current])
 	if err != nil {
 		return nil, fmt.Errorf("failed to send external: %w", err)
 	}

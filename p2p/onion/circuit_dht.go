@@ -11,7 +11,7 @@ import (
 )
 
 // Performs a remote look up in the last node of the circuit. This prevent exposing your query to the DHT network
-func (c *Circuit) HiddenDHT(cid cid.Cid) (peers []peer.AddrInfo, err error) {
+func (c *Circuit) HiddenDHT(ctx context.Context, cid cid.Cid) (peers []peer.AddrInfo, err error) {
 	var req = message.Message{
 		Data: message.Data{
 			HiddenDHT: &message.HiddenDHT{
@@ -19,7 +19,7 @@ func (c *Circuit) HiddenDHT(cid cid.Cid) (peers []peer.AddrInfo, err error) {
 			},
 		},
 	}
-	err = req.Send(c.Active, c.Settings[c.Current])
+	err = req.Send(ctx, c.Active, c.Settings[c.Current])
 	if err != nil {
 		return nil, fmt.Errorf("failed to send external: %w", err)
 	}

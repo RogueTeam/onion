@@ -1,6 +1,7 @@
 package onion
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -43,14 +44,14 @@ type Connection struct {
 }
 
 // Base logic for handling the connection
-func (c *Connection) Handle() (err error) {
+func (c *Connection) Handle(ctx context.Context) (err error) {
 	// Send Settings
 	var settings = message.Message{
 		Data: message.Data{
 			Settings: c.Settings,
 		},
 	}
-	err = settings.Send(c.Conn, DefaultSettings)
+	err = settings.Send(ctx, c.Conn, DefaultSettings)
 	if err != nil {
 		c.Logger.Log(log.LogLevelError, "SENDING SETTINGS: %v", err)
 		return
@@ -92,7 +93,7 @@ func (c *Connection) Handle() (err error) {
 				return fmt.Errorf("failed to handle bind: %w", err)
 			}
 		case msg.Data.HiddenDHT != nil:
-			err = c.HiddenDHT(&msg)
+			err = c.HiddenDHT(ctx, &msg)
 			if err != nil {
 				return fmt.Errorf("failed to handle hidden dht: %w", err)
 			}

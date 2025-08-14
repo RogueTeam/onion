@@ -1,13 +1,13 @@
 package onion
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion/message"
-	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
@@ -18,7 +18,7 @@ import (
 // Extends the circuit with a new peer.
 // This function assumes the passed id corresponds to a valid onion protocol peer.
 // Use ListPeers for more details
-func (c *Circuit) Extend(id peer.ID) (err error) {
+func (c *Circuit) Extend(ctx context.Context, id peer.ID) (err error) {
 	// Generate a hidden Identifier to validate communications with the peer
 	hiddenIdentity, err := identity.NewKey()
 	if err != nil {
@@ -33,7 +33,6 @@ func (c *Circuit) Extend(id peer.ID) (err error) {
 	var conn net.Conn
 	// If there are no initial peer connected. New peer is then the root peer
 	if c.RootStream == nil {
-		ctx, _ := utils.NewContext()
 		c.RootStream, err = c.Service.Host.NewStream(ctx, id, ProtocolId)
 		if err != nil {
 			return fmt.Errorf("failed to connecto to root peer: %w", err)
@@ -55,7 +54,7 @@ func (c *Circuit) Extend(id peer.ID) (err error) {
 				},
 			},
 		}
-		err = connInternal.Send(conn, oldSettings)
+		err = connInternal.Send(ctx, conn, oldSettings)
 		if err != nil {
 			return fmt.Errorf("failed to send connect internal: %w", err)
 		}
@@ -83,7 +82,7 @@ func (c *Circuit) Extend(id peer.ID) (err error) {
 			},
 		},
 	}
-	err = noiseMsg.Send(conn, settings)
+	err = noiseMsg.Send(ctx, conn, settings)
 	if err != nil {
 		return fmt.Errorf("failed to send noise request: %w", err)
 	}
@@ -93,7 +92,6 @@ func (c *Circuit) Extend(id peer.ID) (err error) {
 		return fmt.Errorf("failed to prepare noise transport: %w", err)
 	}
 
-	ctx, _ := utils.NewContext()
 	c.Active, err = ns.SecureOutbound(ctx, conn, id)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade connection: %w", err)

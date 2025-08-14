@@ -1,6 +1,7 @@
 package onion
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,7 +49,7 @@ func (c *Circuit) Close() (err error) {
 	return nil
 }
 
-func (s *Service) Circuit(peers []peer.ID) (c *Circuit, err error) {
+func (s *Service) Circuit(ctx context.Context, peers []peer.ID) (c *Circuit, err error) {
 	if len(peers) == 0 {
 		return nil, errors.New("no peers provided")
 	}
@@ -58,7 +59,7 @@ func (s *Service) Circuit(peers []peer.ID) (c *Circuit, err error) {
 		Service:  s,
 	}
 	for _, peerId := range peers {
-		err = c.Extend(peerId)
+		err = c.Extend(ctx, peerId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to peer: %s: %w", peerId, err)
 		}

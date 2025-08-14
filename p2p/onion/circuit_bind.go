@@ -1,6 +1,7 @@
 package onion
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -39,7 +40,7 @@ func (h *HiddenServiceListener) Accept() (conn io.ReadWriteCloser, err error) {
 }
 
 // Binds a hidden service based on a private key
-func (c *Circuit) Bind(priv crypto.PrivKey) (h *HiddenServiceListener, err error) {
+func (c *Circuit) Bind(ctx context.Context, priv crypto.PrivKey) (h *HiddenServiceListener, err error) {
 	hiddenAddress, err := HiddenAddressFromPrivKey(priv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from private key: %w", err)
@@ -63,7 +64,7 @@ func (c *Circuit) Bind(priv crypto.PrivKey) (h *HiddenServiceListener, err error
 			},
 		},
 	}
-	err = bind.Send(c.Active, c.Settings[c.Current])
+	err = bind.Send(ctx, c.Active, c.Settings[c.Current])
 	if err != nil {
 		return nil, fmt.Errorf("failed to send bind: %w", err)
 	}
