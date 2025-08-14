@@ -18,7 +18,7 @@ func (c *Connection) External(msg *message.Message) (err error) {
 	if msg.Data.External == nil {
 		return errors.New("external not passed")
 	}
-	if !c.OutsideMode {
+	if !c.ExitNode {
 		return errors.New("this peer doesn't support external mode")
 	}
 

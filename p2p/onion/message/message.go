@@ -22,7 +22,7 @@ const (
 
 type (
 	Settings struct {
-		OutsideMode   bool
+		ExitNode      bool
 		PoWDifficulty uint64
 	}
 	Noise struct {
