@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io"
+	"net"
 
 	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
@@ -19,12 +19,18 @@ type HiddenServiceListener struct {
 	Session *yamux.Session
 }
 
+var _ net.Listener = (*HiddenServiceListener)(nil)
+
 func (h *HiddenServiceListener) Close() (err error) {
 	return h.Session.Close()
 }
 
+func (h *HiddenServiceListener) Addr() (addr net.Addr) {
+	return nil
+}
+
 // Accept hidden service connections
-func (h *HiddenServiceListener) Accept() (conn io.ReadWriteCloser, err error) {
+func (h *HiddenServiceListener) Accept() (conn net.Conn, err error) {
 	insecure, err := h.Session.Accept()
 	if err != nil {
 		return nil, fmt.Errorf("failed to accept connection: %w", err)

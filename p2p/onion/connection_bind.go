@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/RogueTeam/onion/p2p/log"
 	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
@@ -35,6 +36,7 @@ func (c *Connection) Bind(msg *message.Message) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to convert public key to hidden address: %w", err)
 	}
+	c.Logger.Log(log.LogLevelInfo, "Hidden service address: %v", hiddenAddress)
 
 	// Prepare signature ===================================
 	sig, err := hex.DecodeString(msg.Data.Bind.HexSignature)
@@ -59,6 +61,7 @@ func (c *Connection) Bind(msg *message.Message) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to create cid from pub hash: %w", err)
 	}
+	c.Logger.Log(log.LogLevelInfo, "Hidden service CID: %v", cid)
 
 	err = c.DHT.Provide(ctx, cid, true)
 	if err != nil {

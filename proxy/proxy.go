@@ -37,8 +37,10 @@ type Proxy struct {
 	Service              *onion.Service
 	PeersRefreshInterval time.Duration
 
-	once     sync.Once
-	allPeers []*onion.Peer
+	once sync.Once
+
+	peersMutex sync.Mutex
+	allPeers   []*onion.Peer
 }
 
 func (p *Proxy) refreshPeers() {
@@ -47,6 +49,9 @@ func (p *Proxy) refreshPeers() {
 		defer ticker.Stop()
 		for {
 			func() {
+				p.peersMutex.Lock()
+				defer p.peersMutex.Unlock()
+
 				log.Println("[*] Refreshing peer list")
 				defer log.Println("[+] Refreshed peer list")
 				ctx, cancel := utils.NewContext()
@@ -68,7 +73,9 @@ func (p *Proxy) refreshPeers() {
 
 // Simple random function this should do some more complex checking
 func (p *Proxy) constructCircuit(ctx context.Context) (circuit *onion.Circuit, err error) {
+	p.peersMutex.Lock()
 	allPeers := slices.Clone(p.allPeers)
+	p.peersMutex.Unlock()
 	random.Shuffle(len(allPeers), func(i, j int) {
 		allPeers[i] = allPeers[j]
 	})
@@ -119,7 +126,16 @@ func (p *Proxy) Serve() (err error) {
 
 			if strings.HasSuffix(host, ".libonion") {
 				log.Println("[*] Connecting to hidden service")
-				candidates, err := circuit.HiddenDHT(ctx, onion.CidFromData(host))
+
+				rawAddr := strings.TrimSuffix(host, ".libonion")
+				peerId, err := peer.Decode(rawAddr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode peer id: %w", err)
+				}
+				log.Println("Raw address:", peerId)
+				cid := onion.CidFromData(peerId)
+				log.Println("Searching for cid:", cid)
+				candidates, err := circuit.HiddenDHT(ctx, cid)
 				if err != nil {
 					return nil, fmt.Errorf("failed to find hidden service candidates: %w", err)
 				}
@@ -134,7 +150,7 @@ func (p *Proxy) Serve() (err error) {
 					return nil, fmt.Errorf("failed to extend circuit to candidate: %w", err)
 				}
 
-				hiddenService, err := circuit.Dial(ctx, peer.ID(host))
+				hiddenService, err := circuit.Dial(ctx, peerId)
 				if err != nil {
 					return nil, fmt.Errorf("failed to connect to hidden service: %w", err)
 				}
