@@ -66,6 +66,7 @@ var Command = cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to preapre host: %w", err)
 		}
+		defer host.Close()
 
 		log.Println("[*] Listening at:")
 		for _, addr := range host.Addrs() {
@@ -85,6 +86,7 @@ var Command = cli.Command{
 		if err != nil {
 			return fmt.Errorf("failed to setup dht: %w", err)
 		}
+		defer hostDht.Close()
 
 		onionCfg := onion.
 			DefaultConfig().
@@ -103,6 +105,7 @@ var Command = cli.Command{
 			if err != nil {
 				return fmt.Errorf("failed to listen proxy: %w", err)
 			}
+			defer listener.Close()
 
 			log.Println("[*] Proxy Listening at:", config.Proxy.ListenAddress)
 			go func() {
