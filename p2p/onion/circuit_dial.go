@@ -7,13 +7,14 @@ import (
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/hashicorp/yamux"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/sec"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
 type HiddenServiceConnection struct {
-	Address peer.ID
+	Address cid.Cid
 	Noise   *noise.Transport
 	Session *yamux.Session
 }
@@ -28,7 +29,11 @@ func (h *HiddenServiceConnection) Open(ctx context.Context) (conn sec.SecureConn
 		return nil, fmt.Errorf("failed to open connection: %w", err)
 	}
 
-	conn, err = h.Noise.SecureOutbound(ctx, insecure, h.Address)
+	id, err := peer.FromCid(h.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain peer id from cid: %w", err)
+	}
+	conn, err = h.Noise.SecureOutbound(ctx, insecure, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed upgrade connection: %w", err)
 	}
@@ -39,7 +44,7 @@ func (h *HiddenServiceConnection) Open(ctx context.Context) (conn sec.SecureConn
 // The yamux session can create multiple dials to the same address using the session.Open method.
 // The circuit should be constructed in order to force the last node be the one advertising the service.
 // If not, the connection will fail
-func (c *Circuit) Dial(ctx context.Context, address peer.ID) (hidden *HiddenServiceConnection, err error) {
+func (c *Circuit) Dial(ctx context.Context, address cid.Cid) (hidden *HiddenServiceConnection, err error) {
 	var dial = message.Message{
 		Data: message.Data{
 			Dial: &message.Dial{

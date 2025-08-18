@@ -42,7 +42,7 @@ type (
 	}
 	Dial struct {
 		// Address of the hidden service
-		Address peer.ID `json:"address"`
+		Address cid.Cid `json:"address"`
 	}
 	// HiddenDHT msg used for querying anonymously the IPFS HiddenDHT without revealing who is doing it
 	HiddenDHT struct {

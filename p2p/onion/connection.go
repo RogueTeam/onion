@@ -9,10 +9,10 @@ import (
 	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
+	"github.com/ipfs/go-cid"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
@@ -40,7 +40,7 @@ type Connection struct {
 	// Used for identifying those peers that support External mode (Exit nodes)
 	ExitNode bool
 	// Storage for hidden services
-	HiddenServices *utils.Map[peer.ID, *yamux.Session]
+	HiddenServices *utils.Map[cid.Cid, *yamux.Session]
 }
 
 // Base logic for handling the connection

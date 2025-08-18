@@ -57,7 +57,7 @@ func (c *Circuit) Bind(ctx context.Context, priv crypto.PrivKey) (h *HiddenServi
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
 	}
 
-	sign, err := priv.Sign([]byte(hiddenAddress))
+	sign, err := priv.Sign(hiddenAddress.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}

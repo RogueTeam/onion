@@ -12,7 +12,7 @@ import (
 
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion"
-	"github.com/RogueTeam/onion/proxy"
+	"github.com/RogueTeam/onion/p2p/proxy"
 	"github.com/RogueTeam/onion/testsuite"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/ipfs/go-datastore"
@@ -45,12 +45,12 @@ func Test_Proxy(t *testing.T) {
 
 		type Test struct {
 			Name   string
-			Action func(t *testing.T, svc *onion.Service)
+			Action func(t *testing.T, svc *onion.Onion)
 		}
 		tests := []Test{
 			{
 				Name: "Basic HiddenService",
-				Action: func(t *testing.T, svc *onion.Service) {
+				Action: func(t *testing.T, svc *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
@@ -124,8 +124,7 @@ func Test_Proxy(t *testing.T) {
 					}
 					t.Logf("> Raw Address: %v", address)
 
-					cid := onion.CidFromData(address)
-					t.Logf("> Expected CID: %v", cid)
+					t.Logf("> Expected CID: %v", address)
 
 					httpClient := http.Client{
 						Transport: &http.Transport{
@@ -146,7 +145,7 @@ func Test_Proxy(t *testing.T) {
 			},
 			{
 				Name: "External service",
-				Action: func(t *testing.T, svc *onion.Service) {
+				Action: func(t *testing.T, svc *onion.Onion) {
 					assertions := assert.New(t)
 
 					// Prepare listener

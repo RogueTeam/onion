@@ -33,7 +33,7 @@ func (c *Circuit) Extend(ctx context.Context, id peer.ID) (err error) {
 	var conn net.Conn
 	// If there are no initial peer connected. New peer is then the root peer
 	if c.RootStream == nil {
-		c.RootStream, err = c.Service.Host.NewStream(ctx, id, ProtocolId)
+		c.RootStream, err = c.Onion.Host.NewStream(ctx, id, ProtocolId)
 		if err != nil {
 			return fmt.Errorf("failed to connecto to root peer: %w", err)
 		}

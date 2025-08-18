@@ -9,7 +9,7 @@ import (
 
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion"
-	"github.com/RogueTeam/onion/proxy"
+	"github.com/RogueTeam/onion/p2p/proxy"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"

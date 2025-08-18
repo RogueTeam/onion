@@ -34,7 +34,7 @@ var random = mathrand.New(mathrand.NewChaCha8(
 type Proxy struct {
 	proxy                *goproxy.ProxyHttpServer
 	circuitLength        int
-	onion                *onion.Service
+	onion                *onion.Onion
 	peersRefreshInterval time.Duration
 
 	once sync.Once
@@ -128,9 +128,9 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 			return nil, fmt.Errorf("failed to decode peer id: %w", err)
 		}
 		log.Println("Raw address:", peerId)
-		cid := onion.CidFromData(peerId)
-		log.Println("Searching for cid:", cid)
-		candidates, err := circuit.HiddenDHT(ctx, cid)
+		cId := peer.ToCid(peerId)
+		log.Println("Searching for cid:", cId)
+		candidates, err := circuit.HiddenDHT(ctx, cId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find hidden service candidates: %w", err)
 		}
@@ -145,7 +145,7 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 			return nil, fmt.Errorf("failed to extend circuit to candidate: %w", err)
 		}
 
-		hiddenService, err := circuit.Dial(ctx, peerId)
+		hiddenService, err := circuit.Dial(ctx, cId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to hidden service: %w", err)
 		}
@@ -190,7 +190,7 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 
 type Config struct {
 	CircuitLength        int
-	Onion                *onion.Service
+	Onion                *onion.Onion
 	PeersRefreshInterval time.Duration
 }
 

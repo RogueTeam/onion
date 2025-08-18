@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func SetupNetwork(t *testing.T) (dhts []*dht.IpfsDHT, peers []host.Host, svcs []*onion.Service, close func()) {
+func SetupNetwork(t *testing.T) (dhts []*dht.IpfsDHT, peers []host.Host, svcs []*onion.Onion, close func()) {
 	const (
 		ServicePeers = 10
 	)

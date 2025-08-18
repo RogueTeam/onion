@@ -45,7 +45,7 @@ func (c *Connection) Bind(msg *message.Message) (err error) {
 	}
 
 	// Validate signature ==================================
-	valid, err := pub.Verify([]byte(hiddenAddress), sig)
+	valid, err := pub.Verify(hiddenAddress.Bytes(), sig)
 	if err != nil {
 		return fmt.Errorf("failed to verify publickey signature: %w", err)
 	}
@@ -57,13 +57,9 @@ func (c *Connection) Bind(msg *message.Message) (err error) {
 	ctx, cancel := utils.NewContext()
 	defer cancel()
 
-	cid := CidFromData(hiddenAddress)
-	if err != nil {
-		return fmt.Errorf("failed to create cid from pub hash: %w", err)
-	}
-	c.Logger.Log(log.LogLevelInfo, "Hidden service CID: %v", cid)
+	c.Logger.Log(log.LogLevelInfo, "Hidden service CID: %v", hiddenAddress)
 
-	err = c.DHT.Provide(ctx, cid, true)
+	err = c.DHT.Provide(ctx, hiddenAddress, true)
 	if err != nil {
 		return fmt.Errorf("failed to advertise cid: %w", err)
 	}

@@ -9,25 +9,25 @@ import (
 
 // Handles the stream
 // On any error the stream is closed
-func (s *Service) StreamHandler(stream network.Stream) {
+func (o *Onion) StreamHandler(stream network.Stream) {
 	defer stream.Close()
 
-	settings := s.Settings()
-	defer s.Connections.Add(-1)
+	settings := o.Settings()
+	defer o.Connections.Add(-1)
 
 	conn := Connection{
-		Host:     s.Host,
-		DHT:      s.DHT,
+		Host:     o.Host,
+		DHT:      o.DHT,
 		Conn:     &NetConnStream{Stream: stream},
 		Settings: settings,
 		Stream:   stream,
 		Logger: log.Logger{
 			PeerID: stream.Conn().RemotePeer(),
 		},
-		Noise:          s.Noise,
+		Noise:          o.Noise,
 		Secured:        false,
-		ExitNode:       s.ExitNode,
-		HiddenServices: s.HiddenServices,
+		ExitNode:       o.ExitNode,
+		HiddenServices: o.HiddenServices,
 	}
 
 	// TODO: Add some kind of limit to the connection handling

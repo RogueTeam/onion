@@ -24,8 +24,8 @@ type Circuit struct {
 	OrderedPeers []peer.ID
 	// Settings for each peer of the circuit
 	Settings map[peer.ID]*message.Settings
-	// Back reference to the Service
-	Service *Service
+	// Back reference to the Onion
+	Onion *Onion
 	// Root streaming used only for the first node of the circuit.
 	RootStream network.Stream
 	// The currently active connection.
@@ -49,14 +49,14 @@ func (c *Circuit) Close() (err error) {
 	return nil
 }
 
-func (s *Service) Circuit(ctx context.Context, peers []peer.ID) (c *Circuit, err error) {
+func (o *Onion) Circuit(ctx context.Context, peers []peer.ID) (c *Circuit, err error) {
 	if len(peers) == 0 {
 		return nil, errors.New("no peers provided")
 	}
 
 	c = &Circuit{
 		Settings: make(map[peer.ID]*message.Settings),
-		Service:  s,
+		Onion:    o,
 	}
 	for _, peerId := range peers {
 		err = c.Extend(ctx, peerId)

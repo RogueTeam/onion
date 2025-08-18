@@ -19,8 +19,8 @@ type Peer struct {
 // It returns a raw list of the peers using the onion protocol.
 // You could filter based on public threats, remove possible fake nodes.
 // Specific countries, etc.
-func (s *Service) ListPeers(ctx context.Context) (peers []*Peer, err error) {
-	basicNodes, err := s.DHT.FindProviders(ctx, BasicNodeP2PCid)
+func (o *Onion) ListPeers(ctx context.Context) (peers []*Peer, err error) {
+	basicNodes, err := o.DHT.FindProviders(ctx, BasicNodeP2PCid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find basic mode peers: %w", err)
 	}
@@ -34,7 +34,7 @@ func (s *Service) ListPeers(ctx context.Context) (peers []*Peer, err error) {
 		}
 	}
 
-	outsideMode, err := s.DHT.FindProviders(ctx, ExitNodeP2PCid)
+	outsideMode, err := o.DHT.FindProviders(ctx, ExitNodeP2PCid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find outside mode peers: %w", err)
 	}

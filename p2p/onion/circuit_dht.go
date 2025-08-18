@@ -37,7 +37,7 @@ func (c *Circuit) HiddenDHT(ctx context.Context, cid cid.Cid) (peers []peer.Addr
 	peers = res.Data.HiddenDHTResponse.Peers
 	for _, peer := range peers {
 		log.Println(peer)
-		c.Service.DHT.ProviderStore().AddProvider(context.TODO(), cid.Bytes(), peer)
+		c.Onion.DHT.ProviderStore().AddProvider(context.TODO(), cid.Bytes(), peer)
 	}
 	return peers, nil
 }

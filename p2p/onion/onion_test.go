@@ -34,12 +34,12 @@ func Test_Integration(t *testing.T) {
 
 		type Test struct {
 			Name   string
-			Action func(t *testing.T, svc *onion.Service)
+			Action func(t *testing.T, svc *onion.Onion)
 		}
 		tests := []Test{
 			{
 				Name: "External",
-				Action: func(t *testing.T, svc *onion.Service) {
+				Action: func(t *testing.T, svc *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
@@ -87,7 +87,7 @@ func Test_Integration(t *testing.T) {
 			},
 			{
 				Name: "Basic HiddenService",
-				Action: func(t *testing.T, svc *onion.Service) {
+				Action: func(t *testing.T, svc *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
@@ -162,7 +162,7 @@ func Test_Integration(t *testing.T) {
 			},
 			{
 				Name: "Discover HiddenService",
-				Action: func(t *testing.T, svc *onion.Service) {
+				Action: func(t *testing.T, svc *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
@@ -200,7 +200,7 @@ func Test_Integration(t *testing.T) {
 					}
 
 					// time.Sleep(5 * time.Second)
-					peers, err := clientCircuit.HiddenDHT(ctx, onion.CidFromData(address))
+					peers, err := clientCircuit.HiddenDHT(ctx, address)
 					if !assertions.Nil(err, "failed to find peers") {
 						return
 					}

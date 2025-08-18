@@ -8,6 +8,7 @@ import (
 
 	"github.com/RogueTeam/onion/p2p/dhtutils"
 	"github.com/RogueTeam/onion/p2p/onion/message"
+	"github.com/RogueTeam/onion/p2p/peers"
 	"github.com/RogueTeam/onion/pow/hashcash"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/hashicorp/yamux"
@@ -21,18 +22,21 @@ import (
 	yamuxp2p "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/upgrader"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 )
 
 var DefaultMuxerUpgrader = []upgrader.StreamMuxer{{ID: ProtocolId, Muxer: yamuxp2p.DefaultTransport}}
 
-func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address peer.ID, err error) {
-	return peer.IDFromPrivateKey(priv)
+func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address cid.Cid, err error) {
+	return HiddenAddressFromPubKey(priv.GetPublic())
 }
 
-func HiddenAddressFromPubKey(pub crypto.PubKey) (address peer.ID, err error) {
-	return peer.IDFromPublicKey(pub)
+func HiddenAddressFromPubKey(pub crypto.PubKey) (address cid.Cid, err error) {
+	peerId, err := peer.IDFromPublicKey(pub)
+	if err != nil {
+		return cid.Undef, fmt.Errorf("failed to get id from public key: %w", err)
+	}
+
+	return peer.ToCid(peerId), nil
 }
 
 const (
@@ -42,23 +46,16 @@ const (
 )
 
 var (
-	BasicNodeP2PCid cid.Cid = CidFromData(BasicNodeCidString)
-	ExitNodeP2PCid  cid.Cid = CidFromData(ExitNodeCidString)
+	BasicNodeP2PCid cid.Cid = peers.IdentityCidFromData(BasicNodeCidString)
+	ExitNodeP2PCid  cid.Cid = peers.IdentityCidFromData(ExitNodeCidString)
 )
-
-func CidFromData[T ~string | ~[]byte](data T) cid.Cid {
-	bytes := []byte(data)
-
-	mh, _ := multihash.Sum(bytes, multihash.SHA3_224, -1)
-	return cid.NewCidV1(uint64(multicodec.DagCbor), mh)
-}
 
 // Empty settings
 var DefaultSettings = &message.Settings{}
 
 // You could try to setup your own service instance by setting this fields but the
 // "New" function is a plus helper for configuring everything
-type Service struct {
+type Onion struct {
 	// Counter of the number of active connections
 	// This is used for calculating the PoW difficulty
 	Connections atomic.Int64
@@ -73,18 +70,18 @@ type Service struct {
 	// Work in outside mode allowing connections outside the network
 	ExitNode bool
 	// Hidden services the application is serving as proxy
-	HiddenServices *utils.Map[peer.ID, *yamux.Session]
+	HiddenServices *utils.Map[cid.Cid, *yamux.Session]
 }
 
 const ProtocolId protocol.ID = "/onionp2p/0.0.1"
 
 // Settings exposed to connected peers in order to successfully handshake and authenticate msgs
 // defered s.Connection.Add(-1) should be called to ensure non impossible pow difficulty
-func (s *Service) Settings() (settings *message.Settings) {
-	k := s.Connections.Add(1)
+func (o *Onion) Settings() (settings *message.Settings) {
+	k := o.Connections.Add(1)
 	diff := hashcash.LogDifficulty(hashcash.DefaultHashAlgorithm(), k)
 	return &message.Settings{
-		ExitNode:      s.ExitNode,
+		ExitNode:      o.ExitNode,
 		PoWDifficulty: diff,
 	}
 }
@@ -113,7 +110,7 @@ func PromoteService(cfg *Config) (doContinue bool) {
 
 // Register the service into a existing host.Host.
 // Check the docs of Config
-func New(cfg Config) (s *Service, err error) {
+func New(cfg Config) (s *Onion, err error) {
 	cfg = cfg.defaults()
 
 	ctx, cancel := utils.NewContext()
@@ -142,12 +139,12 @@ func New(cfg Config) (s *Service, err error) {
 		}()
 	}
 
-	s = &Service{
+	s = &Onion{
 		ExitNode:       cfg.ExitNode,
 		ID:             cfg.Host.ID(),
 		Host:           cfg.Host,
 		DHT:            cfg.DHT,
-		HiddenServices: new(utils.Map[peer.ID, *yamux.Session]),
+		HiddenServices: new(utils.Map[cid.Cid, *yamux.Session]),
 	}
 
 	s.Noise, err = noise.New(
