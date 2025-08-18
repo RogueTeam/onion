@@ -14,9 +14,11 @@ var ExampleConfig = node.Config{
 	IdentityLocation: "serbero.id",
 	HiddenMode:       false,
 	ExitNode:         false,
-	Bootstrap:        true,
+	Bootstrap: &node.Bootstrap{
+		Wait: true,
+	},
 	Proxy: &node.Proxy{
 		CircuitLength: 3,
-		ListenAddress: multiaddr.StringCast("/ip4/127.0.0.1/tcp/8080"),
+		ListenAddress: multiaddr.StringCast("/ip4/127.0.0.1/tcp/0"),
 	},
 }

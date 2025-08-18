@@ -13,6 +13,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/urfave/cli/v3"
@@ -70,12 +71,31 @@ var Command = cli.Command{
 
 		log.Println("[*] Listening at:")
 		for _, addr := range host.Addrs() {
-			log.Println("-", addr)
+			log.Println("-", addr.Encapsulate(multiaddr.StringCast("/p2p/"+host.ID().String())))
 		}
 
 		dhtOptions := []dht.Option{
-			dht.BootstrapPeers(dht.GetDefaultBootstrapPeerAddrInfos()...),
 			dht.Datastore(datastore.NewMapDatastore()),
+		}
+		if config.Bootstrap != nil {
+			var infos []peer.AddrInfo
+			if len(config.Bootstrap.Hosts) > 0 {
+				log.Println("[*] Using defined bootstrap hosts")
+				for _, addr := range config.Bootstrap.Hosts {
+					info, _ := peer.AddrInfoFromP2pAddr(addr)
+					if info != nil {
+						log.Printf("[+] Custom Bootstrap host: %v", info)
+						infos = append(infos, *info)
+					}
+				}
+			}
+			if config.Bootstrap.Defaults {
+				log.Println("[*] Using default bootstrap hosts")
+				infos = append(infos, dht.GetDefaultBootstrapPeerAddrInfos()...)
+			}
+			if len(infos) > 0 {
+				dhtOptions = append(dhtOptions, dht.BootstrapPeers(infos...))
+			}
 		}
 		if config.HiddenMode {
 			dhtOptions = append(dhtOptions, dht.Mode(dht.ModeClient))
@@ -88,18 +108,20 @@ var Command = cli.Command{
 		}
 		defer hostDht.Close()
 
+		log.Println("[*] Preparing Service")
 		onionCfg := onion.
 			DefaultConfig().
 			WithHost(host).
 			WithDHT(hostDht).
 			WithTTL(config.TTL).
-			WithBootstrap(config.Bootstrap).
+			WithBootstrap(config.Bootstrap != nil && config.Bootstrap.Wait).
 			WithExitNode(config.ExitNode)
 		svc, err := onion.New(onionCfg)
 		if err != nil {
 			return fmt.Errorf("failed to prepare service: %w", err)
 		}
 
+		log.Println("[*] Preparing proxy")
 		if config.Proxy != nil {
 			listener, err := manet.Listen(config.Proxy.ListenAddress)
 			if err != nil {
@@ -107,19 +129,27 @@ var Command = cli.Command{
 			}
 			defer listener.Close()
 
-			log.Println("[*] Proxy Listening at:", config.Proxy.ListenAddress)
+			log.Println("[*] Proxy Listening at:", listener.Multiaddr())
 			go func() {
-				p := proxy.Proxy{
+				p := proxy.New(proxy.Config{
 					CircuitLength:        config.Proxy.CircuitLength,
-					Service:              svc,
-					Listener:             manet.NetListener(listener),
+					Onion:                svc,
 					PeersRefreshInterval: time.Minute,
-				}
-				err := p.Serve()
+				})
+				err := p.Serve(manet.NetListener(listener))
 				if err != nil {
 					log.Fatal(err)
 				}
 			}()
+		} else {
+			log.Println("[*] Proxy disabled")
+		}
+
+		log.Println("[*] Booting services")
+		for _, service := range config.Services {
+			log.Printf("[*] Booting: %s (%s) listening at: %s", service.Name, service.IdentityLocation, service.LocalAddress)
+			// TODO: Implement me!
+
 		}
 
 		time.Sleep(time.Hour)

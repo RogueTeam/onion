@@ -8,6 +8,7 @@ import (
 )
 
 type Service struct {
+	Name             string              `yaml:"name,omitempty"`
 	LocalAddress     multiaddr.Multiaddr `yaml:"local-address"`
 	IdentityLocation string              `yaml:"identity-location"`
 }
@@ -15,6 +16,12 @@ type Service struct {
 type Proxy struct {
 	ListenAddress multiaddr.Multiaddr `yaml:"proxy-address"`
 	CircuitLength int                 `yaml:"circuit-length"`
+}
+
+type Bootstrap struct {
+	Defaults bool                  `yaml:"defaults,omitempty"`
+	Hosts    []multiaddr.Multiaddr `yaml:"hosts,omitempty"`
+	Wait     bool                  `yaml:"wait,omitempty"`
 }
 
 type Config struct {
@@ -34,7 +41,7 @@ type Config struct {
 	// Exit node mode. Permits peers to connect outside the network.
 	ExitNode bool `yaml:"exit-node"`
 	// Wait for bootstraping the node
-	Bootstrap bool `yaml:"bootstrap"`
+	Bootstrap *Bootstrap `yaml:"bootstrap,omitempty"`
 	// HTTP Proxy address
 	Proxy *Proxy `yaml:"proxy,omitempty"`
 }
