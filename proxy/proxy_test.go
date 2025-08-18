@@ -111,13 +111,12 @@ func Test_Proxy(t *testing.T) {
 
 					proxyUrl, _ := url.Parse("http://" + l.Addr().String())
 
-					p := proxy.Proxy{
+					p := proxy.New(proxy.Config{
 						CircuitLength:        3,
-						Listener:             l,
-						Service:              clientSvc,
+						Onion:                clientSvc,
 						PeersRefreshInterval: time.Minute,
-					}
-					go p.Serve()
+					})
+					go p.Serve(l)
 
 					address, err := onion.HiddenAddressFromPrivKey(hiddenPriv)
 					if !assertions.Nil(err, "failed to get address from priv key") {
@@ -192,13 +191,12 @@ func Test_Proxy(t *testing.T) {
 
 					proxyUrl, _ := url.Parse("http://" + l.Addr().String())
 
-					p := proxy.Proxy{
+					p := proxy.New(proxy.Config{
 						CircuitLength:        3,
-						Listener:             l,
-						Service:              clientSvc,
+						Onion:                clientSvc,
 						PeersRefreshInterval: time.Minute,
-					}
-					go p.Serve()
+					})
+					go p.Serve(l)
 
 					address := server.Addr().String()
 					t.Logf("> Raw Address: %v", address)

@@ -32,10 +32,10 @@ var random = mathrand.New(mathrand.NewChaCha8(
 
 // Easy implementation of an HTTP proxy over the onion protocol
 type Proxy struct {
-	CircuitLength        int
-	Listener             net.Listener
-	Service              *onion.Service
-	PeersRefreshInterval time.Duration
+	proxy                *goproxy.ProxyHttpServer
+	circuitLength        int
+	onion                *onion.Service
+	peersRefreshInterval time.Duration
 
 	once sync.Once
 
@@ -45,7 +45,7 @@ type Proxy struct {
 
 func (p *Proxy) refreshPeers() {
 	p.once.Do(func() {
-		ticker := time.NewTicker(p.PeersRefreshInterval)
+		ticker := time.NewTicker(p.peersRefreshInterval)
 		defer ticker.Stop()
 		for {
 			func() {
@@ -57,12 +57,12 @@ func (p *Proxy) refreshPeers() {
 				ctx, cancel := utils.NewContext()
 				defer cancel()
 
-				allPeers, err := p.Service.ListPeers(ctx)
+				allPeers, err := p.onion.ListPeers(ctx)
 				if err != nil {
 					log.Println("[!] Failed to refresh peer list:", err)
 				}
 				slices.DeleteFunc(allPeers, func(e *onion.Peer) bool {
-					return e.Info.ID == p.Service.ID
+					return e.Info.ID == p.onion.ID
 				})
 				p.allPeers = allPeers
 			}()
@@ -81,7 +81,7 @@ func (p *Proxy) constructCircuit(ctx context.Context) (circuit *onion.Circuit, e
 	})
 
 	peers := set.New[peer.ID]()
-	for _, peer := range allPeers[:min(p.CircuitLength, len(allPeers))] {
+	for _, peer := range allPeers[:min(p.circuitLength, len(allPeers))] {
 		if peer == nil {
 			continue
 		}
@@ -90,7 +90,7 @@ func (p *Proxy) constructCircuit(ctx context.Context) (circuit *onion.Circuit, e
 	log.Println("[*] Peers", peers)
 
 	log.Println("[*] Constructing circuit")
-	circuit, err = p.Service.Circuit(ctx, peers.Slice())
+	circuit, err = p.onion.Circuit(ctx, peers.Slice())
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct circuit: %w", err)
 	}
@@ -98,102 +98,120 @@ func (p *Proxy) constructCircuit(ctx context.Context) (circuit *onion.Circuit, e
 	return circuit, nil
 }
 
-func (p *Proxy) Serve() (err error) {
+func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net.Conn, err error) {
+	log.Println("[*] Connecting to", addr)
+	circuit, err := p.constructCircuit(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct circuit: %w", err)
+	}
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		if circuit != nil {
+			circuit.Close()
+		}
+	}()
+
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host:port from addr: %w", err)
+	}
+
+	if strings.HasSuffix(host, ".libonion") {
+		log.Println("[*] Connecting to hidden service")
+
+		rawAddr := strings.TrimSuffix(host, ".libonion")
+		peerId, err := peer.Decode(rawAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode peer id: %w", err)
+		}
+		log.Println("Raw address:", peerId)
+		cid := onion.CidFromData(peerId)
+		log.Println("Searching for cid:", cid)
+		candidates, err := circuit.HiddenDHT(ctx, cid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find hidden service candidates: %w", err)
+		}
+		if len(candidates) == 0 {
+			return nil, fmt.Errorf("no candidates found for address: %s", host)
+		}
+
+		random.Shuffle(len(candidates), func(i, j int) { candidates[i] = candidates[j] })
+
+		err = circuit.Extend(ctx, candidates[0].ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extend circuit to candidate: %w", err)
+		}
+
+		hiddenService, err := circuit.Dial(ctx, peerId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to hidden service: %w", err)
+		}
+		conn, err := hiddenService.Open(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open hidden service connection: %w", err)
+		}
+		return conn, nil
+	}
+
+	log.Println("[*] Connecting to public service")
+	exitNodes, err := circuit.HiddenDHT(ctx, onion.ExitNodeP2PCid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find exit nodes: %w", err)
+	}
+	if len(exitNodes) == 0 {
+		return nil, errors.New("no exit nodes found")
+	}
+
+	random.Shuffle(len(exitNodes), func(i, j int) { exitNodes[i] = exitNodes[j] })
+	err = circuit.Extend(ctx, exitNodes[0].ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extend exit nodes: %w", err)
+	}
+
+	var maddr multiaddr.Multiaddr
+	asAddr, _ := netip.ParseAddr(host)
+	if asAddr.Is4() {
+		maddr, _ = multiaddr.NewMultiaddr("/ip4/" + host + "/tcp/" + port)
+	} else if asAddr.Is6() {
+		maddr, _ = multiaddr.NewMultiaddr("/ip6/" + host + "/tcp/" + port)
+	} else {
+		maddr, _ = multiaddr.NewMultiaddr("/dnsaddr/" + host + "/tcp/" + port)
+	}
+
+	conn, err = circuit.External(ctx, maddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial external service: %w", err)
+	}
+	return conn, nil
+}
+
+type Config struct {
+	CircuitLength        int
+	Onion                *onion.Service
+	PeersRefreshInterval time.Duration
+}
+
+func New(cfg Config) (p *Proxy) {
+	p = &Proxy{
+		proxy:                goproxy.NewProxyHttpServer(),
+		circuitLength:        cfg.CircuitLength,
+		onion:                cfg.Onion,
+		peersRefreshInterval: cfg.PeersRefreshInterval,
+	}
+
+	p.proxy.Tr = &http.Transport{
+		DialContext: p.DialContext,
+	}
+	return p
+}
+
+func (p *Proxy) Serve(l net.Listener) (err error) {
 	go p.refreshPeers()
 
-	proxy := goproxy.NewProxyHttpServer()
-	proxy.Tr = &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-			log.Println("[*] Connecting to", addr)
-			circuit, err := p.constructCircuit(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to construct circuit: %w", err)
-			}
-			defer func() {
-				if err == nil {
-					return
-				}
-
-				if circuit != nil {
-					circuit.Close()
-				}
-			}()
-
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get host:port from addr: %w", err)
-			}
-
-			if strings.HasSuffix(host, ".libonion") {
-				log.Println("[*] Connecting to hidden service")
-
-				rawAddr := strings.TrimSuffix(host, ".libonion")
-				peerId, err := peer.Decode(rawAddr)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode peer id: %w", err)
-				}
-				log.Println("Raw address:", peerId)
-				cid := onion.CidFromData(peerId)
-				log.Println("Searching for cid:", cid)
-				candidates, err := circuit.HiddenDHT(ctx, cid)
-				if err != nil {
-					return nil, fmt.Errorf("failed to find hidden service candidates: %w", err)
-				}
-				if len(candidates) == 0 {
-					return nil, fmt.Errorf("no candidates found for address: %s", host)
-				}
-
-				random.Shuffle(len(candidates), func(i, j int) { candidates[i] = candidates[j] })
-
-				err = circuit.Extend(ctx, candidates[0].ID)
-				if err != nil {
-					return nil, fmt.Errorf("failed to extend circuit to candidate: %w", err)
-				}
-
-				hiddenService, err := circuit.Dial(ctx, peerId)
-				if err != nil {
-					return nil, fmt.Errorf("failed to connect to hidden service: %w", err)
-				}
-				conn, err := hiddenService.Open(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("failed to open hidden service connection: %w", err)
-				}
-				return conn, nil
-			}
-
-			log.Println("[*] Connecting to public service")
-			exitNodes, err := circuit.HiddenDHT(ctx, onion.ExitNodeP2PCid)
-			if err != nil {
-				return nil, fmt.Errorf("failed to find exit nodes: %w", err)
-			}
-			if len(exitNodes) == 0 {
-				return nil, errors.New("no exit nodes found")
-			}
-
-			random.Shuffle(len(exitNodes), func(i, j int) { exitNodes[i] = exitNodes[j] })
-			err = circuit.Extend(ctx, exitNodes[0].ID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to extend exit nodes: %w", err)
-			}
-
-			var maddr multiaddr.Multiaddr
-			asAddr, _ := netip.ParseAddr(host)
-			if asAddr.Is4() {
-				maddr, _ = multiaddr.NewMultiaddr("/ip4/" + host + "/tcp/" + port)
-			} else if asAddr.Is6() {
-				maddr, _ = multiaddr.NewMultiaddr("/ip6/" + host + "/tcp/" + port)
-			} else {
-				maddr, _ = multiaddr.NewMultiaddr("/dnsaddr/" + host + "/tcp/" + port)
-			}
-
-			conn, err = circuit.External(ctx, maddr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to dial external service: %w", err)
-			}
-			return conn, nil
-		},
-	}
-	err = http.Serve(p.Listener, proxy)
+	err = http.Serve(l, p.proxy)
 	if err != nil {
 		return fmt.Errorf("failed to serve proxy: %w", err)
 	}
