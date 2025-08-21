@@ -10,14 +10,11 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"slices"
 	"strings"
-	"sync"
-	"time"
 
+	"github.com/RogueTeam/onion/p2p/database"
 	"github.com/RogueTeam/onion/p2p/onion"
 	"github.com/RogueTeam/onion/set"
-	"github.com/RogueTeam/onion/utils"
 	"github.com/elazarl/goproxy"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -32,50 +29,16 @@ var random = mathrand.New(mathrand.NewChaCha8(
 
 // Easy implementation of an HTTP proxy over the onion protocol
 type Proxy struct {
-	proxy                *goproxy.ProxyHttpServer
-	circuitLength        int
-	onion                *onion.Onion
-	peersRefreshInterval time.Duration
-
-	once sync.Once
-
-	peersMutex sync.Mutex
-	allPeers   []*onion.Peer
-}
-
-func (p *Proxy) refreshPeers() {
-	p.once.Do(func() {
-		ticker := time.NewTicker(p.peersRefreshInterval)
-		defer ticker.Stop()
-		for {
-			func() {
-				p.peersMutex.Lock()
-				defer p.peersMutex.Unlock()
-
-				log.Println("[*] Refreshing peer list")
-				defer log.Println("[+] Refreshed peer list")
-				ctx, cancel := utils.NewContext()
-				defer cancel()
-
-				allPeers, err := p.onion.ListPeers(ctx)
-				if err != nil {
-					log.Println("[!] Failed to refresh peer list:", err)
-				}
-				slices.DeleteFunc(allPeers, func(e *onion.Peer) bool {
-					return e.Info.ID == p.onion.ID
-				})
-				p.allPeers = allPeers
-			}()
-			<-ticker.C
-		}
-	})
+	proxy         *goproxy.ProxyHttpServer
+	circuitLength int
+	onion         *onion.Onion
+	database      *database.Database
 }
 
 // Simple random function this should do some more complex checking
 func (p *Proxy) constructCircuit(ctx context.Context) (circuit *onion.Circuit, err error) {
-	p.peersMutex.Lock()
-	allPeers := slices.Clone(p.allPeers)
-	p.peersMutex.Unlock()
+	allPeers := p.database.All()
+
 	random.Shuffle(len(allPeers), func(i, j int) {
 		allPeers[i] = allPeers[j]
 	})
@@ -189,17 +152,17 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 }
 
 type Config struct {
-	CircuitLength        int
-	Onion                *onion.Onion
-	PeersRefreshInterval time.Duration
+	CircuitLength int
+	Onion         *onion.Onion
+	Database      *database.Database
 }
 
 func New(cfg Config) (p *Proxy) {
 	p = &Proxy{
-		proxy:                goproxy.NewProxyHttpServer(),
-		circuitLength:        cfg.CircuitLength,
-		onion:                cfg.Onion,
-		peersRefreshInterval: cfg.PeersRefreshInterval,
+		proxy:         goproxy.NewProxyHttpServer(),
+		circuitLength: cfg.CircuitLength,
+		onion:         cfg.Onion,
+		database:      cfg.Database,
 	}
 
 	p.proxy.Tr = &http.Transport{
@@ -209,8 +172,6 @@ func New(cfg Config) (p *Proxy) {
 }
 
 func (p *Proxy) Serve(l net.Listener) (err error) {
-	go p.refreshPeers()
-
 	err = http.Serve(l, p.proxy)
 	if err != nil {
 		return fmt.Errorf("failed to serve proxy: %w", err)

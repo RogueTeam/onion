@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RogueTeam/onion/p2p/database"
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion"
 	"github.com/RogueTeam/onion/p2p/proxy"
@@ -105,6 +106,12 @@ func Test_Proxy(t *testing.T) {
 						WithExitNode(false))
 					assertions.Nil(err, "failed to prepare service")
 
+					db := database.New(database.Config{
+						Onion:           clientSvc,
+						RefreshInterval: time.Second,
+					})
+					defer db.Close()
+
 					l, err := net.Listen("tcp", "127.0.0.1:0")
 					assertions.Nil(err, "failed to listen")
 					defer l.Close()
@@ -112,9 +119,9 @@ func Test_Proxy(t *testing.T) {
 					proxyUrl, _ := url.Parse("http://" + l.Addr().String())
 
 					p := proxy.New(proxy.Config{
-						CircuitLength:        3,
-						Onion:                clientSvc,
-						PeersRefreshInterval: time.Minute,
+						CircuitLength: 3,
+						Onion:         clientSvc,
+						Database:      db,
 					})
 					go p.Serve(l)
 
@@ -184,6 +191,12 @@ func Test_Proxy(t *testing.T) {
 						WithExitNode(false))
 					assertions.Nil(err, "failed to prepare service")
 
+					db := database.New(database.Config{
+						Onion:           clientSvc,
+						RefreshInterval: time.Second,
+					})
+					defer db.Close()
+
 					l, err := net.Listen("tcp", "127.0.0.1:0")
 					assertions.Nil(err, "failed to listen")
 					defer l.Close()
@@ -191,9 +204,9 @@ func Test_Proxy(t *testing.T) {
 					proxyUrl, _ := url.Parse("http://" + l.Addr().String())
 
 					p := proxy.New(proxy.Config{
-						CircuitLength:        3,
-						Onion:                clientSvc,
-						PeersRefreshInterval: time.Minute,
+						CircuitLength: 3,
+						Onion:         clientSvc,
+						Database:      db,
 					})
 					go p.Serve(l)
 
