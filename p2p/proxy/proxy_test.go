@@ -46,19 +46,19 @@ func Test_Proxy(t *testing.T) {
 
 		type Test struct {
 			Name   string
-			Action func(t *testing.T, svc *onion.Onion)
+			Action func(t *testing.T, o *onion.Onion)
 		}
 		tests := []Test{
 			{
 				Name: "Basic HiddenService",
-				Action: func(t *testing.T, svc *onion.Onion) {
+				Action: func(t *testing.T, o *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
 					defer cancel()
 
 					// Prepare listener
-					c1, err := svc.Circuit(ctx, targets)
+					c1, err := o.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -152,7 +152,7 @@ func Test_Proxy(t *testing.T) {
 			},
 			{
 				Name: "External service",
-				Action: func(t *testing.T, svc *onion.Onion) {
+				Action: func(t *testing.T, o *onion.Onion) {
 					assertions := assert.New(t)
 
 					// Prepare listener

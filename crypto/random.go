@@ -6,9 +6,8 @@ import (
 	mathrand "math/rand/v2"
 )
 
-var random = mathrand.New(mathrand.NewChaCha8(
-	func() (x [32]byte) {
-		rand.Read(x[:])
-		return x
-	}(),
-))
+func random() (r *mathrand.Rand) {
+	var x [32]byte
+	rand.Read(x[:])
+	return mathrand.New(mathrand.NewChaCha8(x))
+}

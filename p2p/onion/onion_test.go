@@ -34,18 +34,18 @@ func Test_Integration(t *testing.T) {
 
 		type Test struct {
 			Name   string
-			Action func(t *testing.T, svc *onion.Onion)
+			Action func(t *testing.T, o *onion.Onion)
 		}
 		tests := []Test{
 			{
 				Name: "External",
-				Action: func(t *testing.T, svc *onion.Onion) {
+				Action: func(t *testing.T, o *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
 					defer cancel()
 
-					c, err := svc.Circuit(ctx, targets)
+					c, err := o.Circuit(ctx, targets)
 					assertions.Nil(err, "failed to prepare circuit")
 					defer c.Close()
 
@@ -87,14 +87,14 @@ func Test_Integration(t *testing.T) {
 			},
 			{
 				Name: "Basic HiddenService",
-				Action: func(t *testing.T, svc *onion.Onion) {
+				Action: func(t *testing.T, o *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
 					defer cancel()
 
 					// Prepare listener
-					c1, err := svc.Circuit(ctx, targets)
+					c1, err := o.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -113,7 +113,7 @@ func Test_Integration(t *testing.T) {
 
 					// Prepare client
 					t.Log("Preparing client")
-					c2, err := svc.Circuit(ctx, targets)
+					c2, err := o.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -162,14 +162,14 @@ func Test_Integration(t *testing.T) {
 			},
 			{
 				Name: "Discover HiddenService",
-				Action: func(t *testing.T, svc *onion.Onion) {
+				Action: func(t *testing.T, o *onion.Onion) {
 					assertions := assert.New(t)
 
 					ctx, cancel := utils.NewContext()
 					defer cancel()
 
 					// Prepare listener
-					serverCircuit, err := svc.Circuit(ctx, targets)
+					serverCircuit, err := o.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -188,7 +188,7 @@ func Test_Integration(t *testing.T) {
 
 					// Prepare client
 					t.Log("Preparing client")
-					clientCircuit, err := svc.Circuit(ctx, targets)
+					clientCircuit, err := o.Circuit(ctx, targets)
 					if !assertions.Nil(err, "failed to prepare circuit") {
 						return
 					}
@@ -243,14 +243,14 @@ func Test_Integration(t *testing.T) {
 				assertions.Nil(err, "failed to prepare client DHT")
 				defer clientPeerDht.Close()
 
-				clientSvc, err := onion.New(
+				clientOnion, err := onion.New(
 					onion.DefaultConfig().
 						WithHost(client).
 						WithDHT(clientPeerDht),
 				)
 				assertions.Nil(err, "failed to prepare peer service")
 
-				test.Action(t, clientSvc)
+				test.Action(t, clientOnion)
 
 			})
 		}

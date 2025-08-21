@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"log"
 	"slices"
 	"sync"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/p2p/onion"
-	"github.com/RogueTeam/onion/set"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -103,33 +103,32 @@ type Circuit struct {
 func (d *Database) Circuit(c Circuit) (circuitPeers []peer.ID, err error) {
 	all := d.All()
 
+	if len(all) == 0 {
+		return nil, errors.New("no peers found")
+	}
+
 	circuitPeers = make([]peer.ID, 0, c.Length)
-
-	var added = set.New[peer.ID]()
-	for index := range c.Length - 1 {
-		peer := all[index]
-
-		if added.Has(peer.Info.ID) {
-			continue
-		}
-
-		if c.LastIsExit && peer.Modes.Has(onion.ExitNodeP2PCid) {
-			continue
-		}
-
-		added.Add(peer.Info.ID)
+	for _, peer := range all[:min(c.Length, len(all))] {
 		circuitPeers = append(circuitPeers, peer.Info.ID)
 	}
 
+	if !c.LastIsExit {
+		return circuitPeers, nil
+	}
+
+	targetted := all[len(circuitPeers)-1]
+	if targetted.Modes.Has(onion.ExitNodeP2PCid) {
+		return circuitPeers, nil
+	}
+
 	for _, peer := range all {
-		if added.Has(peer.Info.ID) {
+		if !peer.Modes.Has(onion.ExitNodeP2PCid) {
 			continue
 		}
 
-		if !c.LastIsExit || peer.Modes.Has(onion.ExitNodeP2PCid) {
-			circuitPeers = append(circuitPeers, peer.Info.ID)
-			break
-		}
+		circuitPeers[len(circuitPeers)-1] = peer.Info.ID
+		break
 	}
+
 	return circuitPeers, nil
 }

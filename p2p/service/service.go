@@ -1,13 +1,18 @@
 package service
 
 import (
+	"net"
+
 	"github.com/RogueTeam/onion/p2p/database"
 	"github.com/RogueTeam/onion/p2p/onion"
+	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
 type Service struct {
-	onion    *onion.Onion
-	database *database.Database
+	replicas      int
+	circuitLength int
+	onion         *onion.Onion
+	database      *database.Database
 }
 
 type Config struct {
@@ -17,8 +22,31 @@ type Config struct {
 	CircuitLength int
 	// Onion service to use
 	Onion *onion.Onion
+	// Database for circuit construction
+	Database *database.Database
 }
 
-func New(cfg Config) (svc *Service, err error) {
-	return svc, nil
+func (s *Service) Listen(priv crypto.PrivKey) (l net.Listener, err error) {
+	lr := &Listener{
+		privKey:       priv,
+		replicas:      s.replicas,
+		circuitLength: s.circuitLength,
+		onion:         s.onion,
+		database:      s.database,
+		running:       true,
+		connections:   make(chan Connection, 1_000),
+	}
+	go lr.setup()
+	return lr, nil
+}
+
+func New(cfg Config) (svc *Service) {
+	svc = &Service{
+		replicas:      cfg.Replicas,
+		circuitLength: cfg.CircuitLength,
+		onion:         cfg.Onion,
+		database:      cfg.Database,
+	}
+
+	return svc
 }

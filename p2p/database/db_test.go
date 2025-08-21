@@ -40,16 +40,16 @@ func Test_Database(t *testing.T) {
 
 		type Test struct {
 			Name   string
-			Action func(t *testing.T, svc *onion.Onion)
+			Action func(t *testing.T, o *onion.Onion)
 		}
 		tests := []Test{
 			{
 				Name: "Basic HiddenService",
-				Action: func(t *testing.T, svc *onion.Onion) {
+				Action: func(t *testing.T, o *onion.Onion) {
 					assertions := assert.New(t)
 
 					db := database.New(database.Config{
-						Onion:           svc,
+						Onion:           o,
 						RefreshInterval: time.Second,
 					})
 					defer db.Close()
