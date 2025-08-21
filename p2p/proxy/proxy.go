@@ -2,30 +2,21 @@ package proxy
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
-	mathrand "math/rand/v2"
 	"net"
 	"net/http"
 	"net/netip"
 	"strings"
 
+	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/p2p/database"
 	"github.com/RogueTeam/onion/p2p/onion"
-	"github.com/RogueTeam/onion/set"
 	"github.com/elazarl/goproxy"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 )
-
-var random = mathrand.New(mathrand.NewChaCha8(
-	func() (x [32]byte) {
-		rand.Read(x[:])
-		return x
-	}(),
-))
 
 // Easy implementation of an HTTP proxy over the onion protocol
 type Proxy struct {
@@ -37,28 +28,84 @@ type Proxy struct {
 
 // Simple random function this should do some more complex checking
 func (p *Proxy) constructCircuit(ctx context.Context) (circuit *onion.Circuit, err error) {
-	allPeers := p.database.All()
-
-	random.Shuffle(len(allPeers), func(i, j int) {
-		allPeers[i] = allPeers[j]
+	circuitPeers, err := p.database.Circuit(database.Circuit{
+		Length:     p.circuitLength,
+		LastIsExit: false,
 	})
-
-	peers := set.New[peer.ID]()
-	for _, peer := range allPeers[:min(p.circuitLength, len(allPeers))] {
-		if peer == nil {
-			continue
-		}
-		peers.Add(peer.Info.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get circuit peers: %w", err)
 	}
-	log.Println("[*] Peers", peers)
 
-	log.Println("[*] Constructing circuit")
-	circuit, err = p.onion.Circuit(ctx, peers.Slice())
+	log.Println("[*] Constructing circuit:", circuitPeers)
+	circuit, err = p.onion.Circuit(ctx, circuitPeers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct circuit: %w", err)
 	}
 
 	return circuit, nil
+}
+
+func (p *Proxy) DialHiddenService(ctx context.Context, circuit *onion.Circuit, addr peer.ID) (conn net.Conn, err error) {
+	log.Println("[*] Connecting to hidden service")
+
+	cId := peer.ToCid(addr)
+	log.Println("Searching for cid:", cId)
+	candidates, err := circuit.HiddenDHT(ctx, cId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find hidden service candidates: %w", err)
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no candidates found for address: %s", addr)
+	}
+
+	extend := crypto.Pick(candidates)
+	err = circuit.Extend(ctx, extend.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extend circuit to candidate: %w", err)
+	}
+
+	hiddenService, err := circuit.Dial(ctx, cId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to hidden service: %w", err)
+	}
+	conn, err = hiddenService.Open(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open hidden service connection: %w", err)
+	}
+	return conn, nil
+}
+
+func (p *Proxy) DialExternal(ctx context.Context, circuit *onion.Circuit, host, port string) (conn net.Conn, err error) {
+	log.Println("[*] Connecting to public service")
+	exitNodes, err := circuit.HiddenDHT(ctx, onion.ExitNodeP2PCid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find exit nodes: %w", err)
+	}
+	if len(exitNodes) == 0 {
+		return nil, errors.New("no exit nodes found")
+	}
+
+	exitNode := crypto.Pick(exitNodes)
+	err = circuit.Extend(ctx, exitNode.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extend exit nodes: %w", err)
+	}
+
+	var maddr multiaddr.Multiaddr
+	asAddr, _ := netip.ParseAddr(host)
+	if asAddr.Is4() {
+		maddr, _ = multiaddr.NewMultiaddr("/ip4/" + host + "/tcp/" + port)
+	} else if asAddr.Is6() {
+		maddr, _ = multiaddr.NewMultiaddr("/ip6/" + host + "/tcp/" + port)
+	} else {
+		maddr, _ = multiaddr.NewMultiaddr("/dnsaddr/" + host + "/tcp/" + port)
+	}
+
+	conn, err = circuit.External(ctx, maddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial external service: %w", err)
+	}
+	return conn, nil
 }
 
 func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net.Conn, err error) {
@@ -83,72 +130,16 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 	}
 
 	if strings.HasSuffix(host, ".libonion") {
-		log.Println("[*] Connecting to hidden service")
-
 		rawAddr := strings.TrimSuffix(host, ".libonion")
-		peerId, err := peer.Decode(rawAddr)
+		addrAsPeerId, err := peer.Decode(rawAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode peer id: %w", err)
 		}
-		log.Println("Raw address:", peerId)
-		cId := peer.ToCid(peerId)
-		log.Println("Searching for cid:", cId)
-		candidates, err := circuit.HiddenDHT(ctx, cId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find hidden service candidates: %w", err)
-		}
-		if len(candidates) == 0 {
-			return nil, fmt.Errorf("no candidates found for address: %s", host)
-		}
 
-		random.Shuffle(len(candidates), func(i, j int) { candidates[i] = candidates[j] })
-
-		err = circuit.Extend(ctx, candidates[0].ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extend circuit to candidate: %w", err)
-		}
-
-		hiddenService, err := circuit.Dial(ctx, cId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to hidden service: %w", err)
-		}
-		conn, err := hiddenService.Open(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open hidden service connection: %w", err)
-		}
-		return conn, nil
+		return p.DialHiddenService(ctx, circuit, addrAsPeerId)
 	}
 
-	log.Println("[*] Connecting to public service")
-	exitNodes, err := circuit.HiddenDHT(ctx, onion.ExitNodeP2PCid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find exit nodes: %w", err)
-	}
-	if len(exitNodes) == 0 {
-		return nil, errors.New("no exit nodes found")
-	}
-
-	random.Shuffle(len(exitNodes), func(i, j int) { exitNodes[i] = exitNodes[j] })
-	err = circuit.Extend(ctx, exitNodes[0].ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extend exit nodes: %w", err)
-	}
-
-	var maddr multiaddr.Multiaddr
-	asAddr, _ := netip.ParseAddr(host)
-	if asAddr.Is4() {
-		maddr, _ = multiaddr.NewMultiaddr("/ip4/" + host + "/tcp/" + port)
-	} else if asAddr.Is6() {
-		maddr, _ = multiaddr.NewMultiaddr("/ip6/" + host + "/tcp/" + port)
-	} else {
-		maddr, _ = multiaddr.NewMultiaddr("/dnsaddr/" + host + "/tcp/" + port)
-	}
-
-	conn, err = circuit.External(ctx, maddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial external service: %w", err)
-	}
-	return conn, nil
+	return p.DialExternal(ctx, circuit, host, port)
 }
 
 type Config struct {

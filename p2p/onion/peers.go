@@ -16,6 +16,7 @@ type Peer struct {
 
 // Lists peers compatible to the onion network.
 // This function is useful with some filtering from your part.
+// It ignore the host serving this onion node by default.
 // It returns a raw list of the peers using the onion protocol.
 // You could filter based on public threats, remove possible fake nodes.
 // Specific countries, etc.
@@ -48,6 +49,9 @@ func (o *Onion) ListPeers(ctx context.Context) (peers []*Peer, err error) {
 
 	peers = make([]*Peer, 0, len(ref))
 	for _, entry := range ref {
+		if entry.Info.ID == o.ID {
+			continue
+		}
 		peers = append(peers, entry)
 	}
 	return peers, nil

@@ -3,7 +3,6 @@ package onion
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/RogueTeam/onion/p2p/onion/message"
 	"github.com/ipfs/go-cid"
@@ -36,7 +35,6 @@ func (c *Circuit) HiddenDHT(ctx context.Context, cid cid.Cid) (peers []peer.Addr
 
 	peers = res.Data.HiddenDHTResponse.Peers
 	for _, peer := range peers {
-		log.Println(peer)
 		c.Onion.DHT.ProviderStore().AddProvider(context.TODO(), cid.Bytes(), peer)
 	}
 	return peers, nil

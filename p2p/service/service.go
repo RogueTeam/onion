@@ -1,15 +1,22 @@
 package service
 
-import "github.com/RogueTeam/onion/p2p/onion"
+import (
+	"github.com/RogueTeam/onion/p2p/database"
+	"github.com/RogueTeam/onion/p2p/onion"
+)
 
 type Service struct {
-	Onion *onion.Onion
+	onion    *onion.Onion
+	database *database.Database
 }
 
 type Config struct {
-	Replicas      int
+	// Number of replicas to receive the traffic from
+	Replicas int
+	// Length of the circuit for each replica
 	CircuitLength int
-	Onion         *onion.Onion
+	// Onion service to use
+	Onion *onion.Onion
 }
 
 func New(cfg Config) (svc *Service, err error) {

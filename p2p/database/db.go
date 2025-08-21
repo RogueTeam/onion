@@ -6,8 +6,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/p2p/onion"
+	"github.com/RogueTeam/onion/set"
 	"github.com/RogueTeam/onion/utils"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // Peers database for local caching of remote peers
@@ -37,9 +40,6 @@ func (d *Database) doRefresh() {
 		log.Println("[!] Failed to refresh peer list:", err)
 		return
 	}
-	slices.DeleteFunc(peers, func(e *onion.Peer) bool {
-		return e.Info.ID == d.onion.ID
-	})
 	d.peers = peers
 
 	if !d.initialized {
@@ -82,9 +82,54 @@ func New(cfg Config) (db *Database) {
 	return db
 }
 
+// Random shiffled peers. Self peer is not include
 func (d *Database) All() (peers []*onion.Peer) {
 	d.mutex.Lock()
-	defer d.mutex.Unlock()
+	all := slices.Clone(d.peers)
+	d.mutex.Unlock()
 
-	return slices.Clone(d.peers)
+	crypto.Shuffle(all)
+	return all
+}
+
+type Circuit struct {
+	// Specifies the length of the circuit.
+	// In case the length can't be satisfied depending on MandatoryLength an error will be returned
+	Length int
+	// Specifies if last node of the circuit should be a exit node
+	LastIsExit bool
+}
+
+func (d *Database) Circuit(c Circuit) (circuitPeers []peer.ID, err error) {
+	all := d.All()
+
+	circuitPeers = make([]peer.ID, 0, c.Length)
+
+	var added = set.New[peer.ID]()
+	for index := range c.Length - 1 {
+		peer := all[index]
+
+		if added.Has(peer.Info.ID) {
+			continue
+		}
+
+		if c.LastIsExit && peer.Modes.Has(onion.ExitNodeP2PCid) {
+			continue
+		}
+
+		added.Add(peer.Info.ID)
+		circuitPeers = append(circuitPeers, peer.Info.ID)
+	}
+
+	for _, peer := range all {
+		if added.Has(peer.Info.ID) {
+			continue
+		}
+
+		if !c.LastIsExit || peer.Modes.Has(onion.ExitNodeP2PCid) {
+			circuitPeers = append(circuitPeers, peer.Info.ID)
+			break
+		}
+	}
+	return circuitPeers, nil
 }
