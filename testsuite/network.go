@@ -14,11 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func SetupNetwork(t *testing.T) (dhts []*dht.IpfsDHT, peers []host.Host, svcs []*onion.Onion, close func()) {
-	const (
-		ServicePeers = 10
-	)
-
+func SetupNetwork(t *testing.T, servicePeers int) (dhts []*dht.IpfsDHT, peers []host.Host, svcs []*onion.Onion, close func()) {
 	assertions := assert.New(t)
 
 	close = func() {
@@ -33,7 +29,7 @@ func SetupNetwork(t *testing.T) (dhts []*dht.IpfsDHT, peers []host.Host, svcs []
 		}
 	}
 
-	for index := range ServicePeers {
+	for index := range servicePeers {
 		ident, err := identity.NewKey()
 		if !assertions.Nil(err, "failed to prepare peer-1 key") {
 			return

@@ -20,11 +20,7 @@ import (
 
 func Test_Integration(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
-		const (
-			ServicePeers = 10
-		)
-
-		_, peers, _, close := testsuite.SetupNetwork(t)
+		_, peers, _, close := testsuite.SetupNetwork(t, 20)
 		defer close()
 
 		targets := make([]peer.ID, 0, len(peers))

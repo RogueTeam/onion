@@ -9,7 +9,9 @@ import (
 
 	"github.com/RogueTeam/onion/p2p/database"
 	"github.com/RogueTeam/onion/p2p/onion"
+	"github.com/RogueTeam/onion/set"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type Listener struct {
@@ -25,6 +27,8 @@ type Listener struct {
 
 	circuitsMutex sync.Mutex
 	circuits      []*onion.Circuit
+
+	usedPeers set.Set[peer.ID]
 }
 
 type Connection struct {
@@ -35,6 +39,9 @@ type Connection struct {
 var _ net.Listener = (*Listener)(nil)
 
 func (l *Listener) constructCircuit(ctx context.Context) (c *onion.Circuit, err error) {
+	l.circuitsMutex.Lock()
+	defer l.circuitsMutex.Unlock()
+
 	circuitPeers, err := l.database.Circuit(database.Circuit{Length: l.circuitLength})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve circuit peers: %w", err)
@@ -44,6 +51,9 @@ func (l *Listener) constructCircuit(ctx context.Context) (c *onion.Circuit, err 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create circuit: %w", err)
 	}
+
+	l.usedPeers.Add(circuit.OrderedPeers...)
+	l.circuits = append(l.circuits, circuit)
 
 	return circuit, nil
 }
@@ -61,10 +71,7 @@ func (l *Listener) replicaJob() {
 		return
 	}
 	defer circuit.Close()
-
-	l.circuitsMutex.Lock()
-	l.circuits = append(l.circuits, circuit)
-	l.circuitsMutex.Unlock()
+	defer l.usedPeers.Del(circuit.OrderedPeers...)
 
 	listener, err := circuit.Bind(ctx, l.privKey)
 	if err != nil {
@@ -114,9 +121,11 @@ func (l *Listener) Close() (err error) {
 	close(l.connections)
 
 	l.circuitsMutex.Lock()
+	l.usedPeers.Clear()
 	for _, c := range l.circuits {
 		c.Close()
 	}
+
 	l.circuitsMutex.Unlock()
 	return nil
 }

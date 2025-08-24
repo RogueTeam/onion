@@ -9,6 +9,7 @@ import (
 
 	"github.com/RogueTeam/onion/crypto"
 	"github.com/RogueTeam/onion/p2p/onion"
+	"github.com/RogueTeam/onion/set"
 	"github.com/RogueTeam/onion/utils"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -66,7 +67,11 @@ func (d *Database) Close() (err error) {
 }
 
 type Config struct {
-	Onion           *onion.Onion
+	// Ignore peers present in the blacklist
+	Blacklist set.Set[peer.ID]
+	// Onion engine to use
+	Onion *onion.Onion
+	// Refresh interval for pulling fresh peers from the DHT
 	RefreshInterval time.Duration
 }
 
@@ -93,6 +98,8 @@ func (d *Database) All() (peers []*onion.Peer) {
 }
 
 type Circuit struct {
+	// Ignored peers prevent reusing same nodes as relay
+	Ignore set.Set[peer.ID]
 	// Specifies the length of the circuit.
 	// In case the length can't be satisfied depending on MandatoryLength an error will be returned
 	Length int
@@ -102,6 +109,11 @@ type Circuit struct {
 
 func (d *Database) Circuit(c Circuit) (circuitPeers []peer.ID, err error) {
 	all := d.All()
+
+	// Remove ignored peers from reference
+	all = slices.DeleteFunc(all, func(p *onion.Peer) bool {
+		return c.Ignore != nil && c.Ignore.Has(p.Info.ID)
+	})
 
 	if len(all) == 0 {
 		return nil, errors.New("no peers found")

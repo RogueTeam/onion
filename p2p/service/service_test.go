@@ -21,11 +21,7 @@ import (
 
 func Test_Service(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
-		const (
-			ServicePeers = 10
-		)
-
-		_, peerHosts, _, close := testsuite.SetupNetwork(t)
+		_, peerHosts, _, close := testsuite.SetupNetwork(t, 20)
 		defer close()
 
 		targets := make([]peer.ID, 0, len(peerHosts))
@@ -85,7 +81,7 @@ func Test_Service(t *testing.T) {
 					})
 					defer serverDb.Close()
 
-					const replicas = 2
+					const replicas = 3
 					svc := service.New(service.Config{
 						Replicas:      replicas,
 						CircuitLength: 3,
@@ -128,7 +124,7 @@ func Test_Service(t *testing.T) {
 							break
 						}
 						t.Log("Sleeping 1s. Allowing workers to spawn")
-						time.Sleep(time.Second)
+						time.Sleep(500 * time.Millisecond)
 					}
 
 					if !assertions.Len(candidates, replicas, "expected amount of candidates") {
