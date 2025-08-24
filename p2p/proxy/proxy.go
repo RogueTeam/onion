@@ -129,8 +129,9 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 		return nil, fmt.Errorf("failed to get host:port from addr: %w", err)
 	}
 
-	if strings.HasSuffix(host, ".libonion") {
-		rawAddr := strings.TrimSuffix(host, ".libonion")
+	if strings.HasSuffix(host, onion.LibOnionDnsFinale) {
+		log.Println("[*] LIBONION request")
+		rawAddr := strings.TrimSuffix(host, onion.LibOnionDnsFinale)
 		addrAsPeerId, err := peer.Decode(rawAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode peer id: %w", err)
@@ -139,6 +140,7 @@ func (p *Proxy) DialContext(ctx context.Context, network, addr string) (conn net
 		return p.DialHiddenService(ctx, circuit, addrAsPeerId)
 	}
 
+	log.Println("[*] Raw request")
 	return p.DialExternal(ctx, circuit, host, port)
 }
 

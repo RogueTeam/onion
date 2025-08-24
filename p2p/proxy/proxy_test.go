@@ -135,7 +135,7 @@ func Test_Proxy(t *testing.T) {
 						},
 					}
 
-					res, err := httpClient.Get("http://" + address.String() + ".libonion")
+					res, err := httpClient.Get("http://" + address.String() + onion.LibOnionDnsFinale)
 					assertions.Nil(err, "failed to get hidden service")
 					t.Logf("STATUS CODE: %v", res.StatusCode)
 					defer res.Body.Close()

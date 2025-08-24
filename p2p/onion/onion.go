@@ -24,6 +24,8 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 )
 
+const LibOnionDnsFinale = ".onix"
+
 var DefaultMuxerUpgrader = []upgrader.StreamMuxer{{ID: ProtocolId, Muxer: yamuxp2p.DefaultTransport}}
 
 func HiddenAddressFromPrivKey(priv crypto.PrivKey) (address cid.Cid, err error) {

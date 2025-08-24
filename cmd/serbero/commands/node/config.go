@@ -9,6 +9,8 @@ import (
 
 type Service struct {
 	Name             string              `yaml:"name,omitempty"`
+	Replicas         int                 `yaml:"replicas,omitempty"`
+	CircuitLength    int                 `yaml:"circuit-length"`
 	LocalAddress     multiaddr.Multiaddr `yaml:"local-address"`
 	IdentityLocation string              `yaml:"identity-location"`
 }

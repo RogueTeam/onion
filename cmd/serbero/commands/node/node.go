@@ -3,13 +3,16 @@ package node
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
 
+	"github.com/RogueTeam/onion/p2p/database"
 	"github.com/RogueTeam/onion/p2p/identity"
 	"github.com/RogueTeam/onion/p2p/onion"
 	"github.com/RogueTeam/onion/p2p/proxy"
+	"github.com/RogueTeam/onion/p2p/service"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -108,7 +111,7 @@ var Command = cli.Command{
 		}
 		defer hostDht.Close()
 
-		log.Println("[*] Preparing Service")
+		log.Println("[*] Preparing Onion")
 		onionCfg := onion.
 			DefaultConfig().
 			WithHost(host).
@@ -116,10 +119,16 @@ var Command = cli.Command{
 			WithTTL(config.TTL).
 			WithBootstrap(config.Bootstrap != nil && config.Bootstrap.Wait).
 			WithExitNode(config.ExitNode)
-		svc, err := onion.New(onionCfg)
+		o, err := onion.New(onionCfg)
 		if err != nil {
-			return fmt.Errorf("failed to prepare service: %w", err)
+			return fmt.Errorf("failed to setup onion: %w", err)
 		}
+
+		db := database.New(database.Config{
+			Onion:           o,
+			RefreshInterval: 15 * time.Minute,
+		})
+		defer db.Close()
 
 		log.Println("[*] Preparing proxy")
 		if config.Proxy != nil {
@@ -132,9 +141,9 @@ var Command = cli.Command{
 			log.Println("[*] Proxy Listening at:", listener.Multiaddr())
 			go func() {
 				p := proxy.New(proxy.Config{
-					CircuitLength:        config.Proxy.CircuitLength,
-					Onion:                svc,
-					PeersRefreshInterval: time.Minute,
+					CircuitLength: config.Proxy.CircuitLength,
+					Onion:         o,
+					Database:      db,
 				})
 				err := p.Serve(manet.NetListener(listener))
 				if err != nil {
@@ -145,11 +154,53 @@ var Command = cli.Command{
 			log.Println("[*] Proxy disabled")
 		}
 
-		log.Println("[*] Booting services")
-		for _, service := range config.Services {
-			log.Printf("[*] Booting: %s (%s) listening at: %s", service.Name, service.IdentityLocation, service.LocalAddress)
-			// TODO: Implement me!
+		if len(config.Services) > 0 {
+			log.Println("[*] Booting services")
+			for _, svc := range config.Services {
+				log.Printf("[*] Booting: %s (%s) listening at: %s", svc.Name, svc.IdentityLocation, svc.LocalAddress)
+				go func() {
+					svcInstance := service.New(service.Config{
+						Replicas:      svc.Replicas,
+						CircuitLength: svc.CircuitLength,
+						Onion:         o,
+						Database:      db,
+					})
 
+					svcIdentity, err := identity.LoadIdentity(svc.IdentityLocation)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					id, _ := peer.IDFromPrivateKey(svcIdentity)
+					idBytes := id.String()
+					os.WriteFile(svc.IdentityLocation+"-address", []byte(idBytes+onion.LibOnionDnsFinale), 0o700)
+					l, err := svcInstance.Listen(svcIdentity)
+					if err != nil {
+						log.Fatal(err)
+					}
+					defer l.Close()
+
+					for {
+						conn, err := l.Accept()
+						if err != nil {
+							log.Fatal(err)
+						}
+						go func() {
+							defer conn.Close()
+
+							target, err := manet.Dial(svc.LocalAddress)
+							if err != nil {
+								log.Printf("[!] Failed to dial remote: %v", err)
+								return
+							}
+							defer target.Close()
+
+							go io.Copy(conn, target)
+							io.Copy(target, conn)
+						}()
+					}
+				}()
+			}
 		}
 
 		time.Sleep(time.Hour)
